@@ -235,6 +235,22 @@ jobs:
         fi
       shell: bash
 
+    - name: Run disabled network tests (allow failure)
+      working-directory: build
+      run: |
+        echo "=== Running disabled network tests (these may fail due to network conditions) ==="
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          if [ "${{ matrix.config.generators }}" = "Visual Studio 17 2022" ] || [ "${{ matrix.config.generators }}" = "Visual Studio 16 2019" ]; then
+            ./${{ matrix.config.build_type }}/NekoNet_tests.exe --gtest_also_run_disabled_tests --gtest_filter=DISABLED_* || echo "Some disabled tests failed (expected)"
+          else
+            ./NekoNet_tests.exe --gtest_also_run_disabled_tests --gtest_filter=DISABLED_* || echo "Some disabled tests failed (expected)"
+          fi
+        else
+          ./NekoNet_tests --gtest_also_run_disabled_tests --gtest_filter=DISABLED_* || echo "Some disabled tests failed (expected)"
+        fi
+      shell: bash
+      continue-on-error: true
+
     - name: Upload build artifacts (on failure)
       if: failure()
       uses: actions/upload-artifact@v4

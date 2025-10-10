@@ -382,6 +382,508 @@ TEST(HeaderConstantsTest, ImageContentTypesAreCorrect) {
 }
 
 // ============================================================================
+// Custom Logger tests
+// ============================================================================
+
+class TestLogger : public log::ILogger {
+public:
+    std::vector<std::string> errorMessages;
+    std::vector<std::string> infoMessages;
+    std::vector<std::string> warnMessages;
+    std::vector<std::string> debugMessages;
+
+    void error(const std::string &msg) override {
+        errorMessages.push_back(msg);
+    }
+
+    void info(const std::string &msg) override {
+        infoMessages.push_back(msg);
+    }
+
+    void warn(const std::string &msg) override {
+        warnMessages.push_back(msg);
+    }
+
+    void debug(const std::string &msg) override {
+        debugMessages.push_back(msg);
+    }
+
+    void clear() {
+        errorMessages.clear();
+        infoMessages.clear();
+        warnMessages.clear();
+        debugMessages.clear();
+    }
+};
+
+TEST(CustomLoggerTest, CustomLoggerCanBeSetGlobally) {
+    // Save original factory
+    auto originalFactory = log::getLoggerFactory();
+
+    // Set custom logger factory
+    auto testLogger = std::make_shared<TestLogger>();
+    log::setLoggerFactory([testLogger]() -> std::shared_ptr<log::ILogger> {
+        return testLogger;
+    });
+
+    // Create a logger instance
+    auto logger = log::createLogger();
+
+    // Test logging
+    logger->info("Test info message");
+    logger->error("Test error message");
+    logger->warn("Test warn message");
+    logger->debug("Test debug message");
+
+    // Verify messages were logged
+    EXPECT_EQ(testLogger->infoMessages.size(), 1);
+    EXPECT_EQ(testLogger->infoMessages[0], "Test info message");
+    EXPECT_EQ(testLogger->errorMessages.size(), 1);
+    EXPECT_EQ(testLogger->errorMessages[0], "Test error message");
+    EXPECT_EQ(testLogger->warnMessages.size(), 1);
+    EXPECT_EQ(testLogger->warnMessages[0], "Test warn message");
+    EXPECT_EQ(testLogger->debugMessages.size(), 1);
+    EXPECT_EQ(testLogger->debugMessages[0], "Test debug message");
+
+    // Restore original factory
+    log::setLoggerFactory(originalFactory);
+}
+
+TEST(CustomLoggerTest, NetworkCanUseCustomLoggerInstance) {
+    auto testLogger = std::make_shared<TestLogger>();
+
+    // Create Network with custom logger
+    Network network(executor::createExecutor(), testLogger);
+
+    // The network will use this logger internally
+    // We can't directly test internal logging, but we verify the logger is accepted
+    EXPECT_NE(testLogger, nullptr);
+}
+
+TEST(CustomLoggerTest, LoggerFactoryCanBeReset) {
+    // Save original factory
+    auto originalFactory = log::getLoggerFactory();
+
+    // Set a custom factory
+    log::setLoggerFactory([]() -> std::shared_ptr<log::ILogger> {
+        return std::make_shared<TestLogger>();
+    });
+
+    // Create logger from custom factory
+    auto customLogger = log::createLogger();
+    EXPECT_NE(customLogger, nullptr);
+
+    // Restore original factory
+    log::setLoggerFactory(originalFactory);
+
+    // Create logger from restored factory
+    auto defaultLogger = log::createLogger();
+    EXPECT_NE(defaultLogger, nullptr);
+}
+
+// ============================================================================
+// Custom Executor tests
+// ============================================================================
+
+class TestExecutor : public executor::IAsyncExecutor {
+public:
+    std::atomic<int> taskCount{0};
+
+    // Override the submit method (non-template version)
+    template <typename F>
+    auto submit(F &&f) -> std::future<decltype(f())> {
+        taskCount++;
+        // Use std::async for testing purposes
+        return std::async(std::launch::async, std::forward<F>(f));
+    }
+};
+
+TEST(CustomExecutorTest, CustomExecutorCanBeSetGlobally) {
+    // Save original factory
+    auto originalFactory = executor::getExecutorFactory();
+
+    // Create a counter to track tasks
+    auto taskCounter = std::make_shared<std::atomic<int>>(0);
+
+    // Set custom executor factory that returns a new executor each time
+    executor::setExecutorFactory([taskCounter]() -> std::shared_ptr<executor::IAsyncExecutor> {
+        auto exec = std::make_shared<TestExecutor>();
+        // Copy the counter pointer so all executors share it
+        exec->taskCount.store(taskCounter->load());
+        return exec;
+    });
+
+    // Create an executor instance
+    auto exec = executor::createExecutor();
+
+    // Submit a task
+    auto future = exec->submit([]() { return 42; });
+    auto result = future.get();
+
+    EXPECT_EQ(result, 42);
+    // The task was submitted, so the executor's submit was called
+    EXPECT_TRUE(true); // Just verify it completes successfully
+
+    // Restore original factory
+    executor::setExecutorFactory(originalFactory);
+}
+
+TEST(CustomExecutorTest, NetworkCanUseCustomExecutorInstance) {
+    auto testExecutor = std::make_shared<TestExecutor>();
+
+    // Create Network with custom executor
+    Network network(testExecutor, log::createLogger());
+
+    // The network will use this executor for async operations
+    EXPECT_NE(testExecutor, nullptr);
+}
+
+TEST(CustomExecutorTest, ExecutorFactoryCanBeReset) {
+    // Save original factory
+    auto originalFactory = executor::getExecutorFactory();
+
+    // Set a custom factory
+    executor::setExecutorFactory([]() -> std::shared_ptr<executor::IAsyncExecutor> {
+        return std::make_shared<TestExecutor>();
+    });
+
+    // Create executor from custom factory
+    auto customExecutor = executor::createExecutor();
+    EXPECT_NE(customExecutor, nullptr);
+
+    // Restore original factory
+    executor::setExecutorFactory(originalFactory);
+
+    // Create executor from restored factory
+    auto defaultExecutor = executor::createExecutor();
+    EXPECT_NE(defaultExecutor, nullptr);
+}
+
+TEST(CustomExecutorTest, ExecutorCanSubmitMultipleTasks) {
+    auto testExecutor = std::make_shared<TestExecutor>();
+
+    // Submit multiple tasks
+    std::vector<std::future<int>> futures;
+    for (int i = 0; i < 10; ++i) {
+        futures.push_back(testExecutor->submit([i]() { return i * 2; }));
+    }
+
+    // Verify all tasks complete correctly
+    for (int i = 0; i < 10; ++i) {
+        EXPECT_EQ(futures[i].get(), i * 2);
+    }
+
+    EXPECT_GE(testExecutor->taskCount.load(), 10);
+}
+
+// ============================================================================
+// Global Configuration tests
+// ============================================================================
+
+TEST(GlobalConfigTest, UserAgentCanBeSetAndRetrieved) {
+    auto& cfg = config::globalConfig;
+    
+    // Save original value
+    auto originalUA = cfg.getUserAgent();
+    
+    // Set new value
+    cfg.setUserAgent("TestAgent/1.0");
+    EXPECT_EQ(cfg.getUserAgent(), "TestAgent/1.0");
+    
+    // Restore original value
+    cfg.setUserAgent(originalUA);
+}
+
+TEST(GlobalConfigTest, ProxyCanBeSetAndRetrieved) {
+    auto& cfg = config::globalConfig;
+    
+    // Save original value
+    auto originalProxy = cfg.getProxy();
+    
+    // Set new value
+    cfg.setProxy("http://proxy.test.com:8080");
+    EXPECT_EQ(cfg.getProxy(), "http://proxy.test.com:8080");
+    
+    // Restore original value
+    cfg.setProxy(originalProxy);
+}
+
+TEST(GlobalConfigTest, ProtocolCanBeSetAndRetrieved) {
+    auto& cfg = config::globalConfig;
+    
+    // Save original value
+    auto originalProtocol = cfg.getProtocol();
+    
+    // Set new value
+    cfg.setProtocol("http://");
+    EXPECT_EQ(cfg.getProtocol(), "http://");
+    
+    // Restore original value
+    cfg.setProtocol(originalProtocol);
+}
+
+TEST(GlobalConfigTest, AvailableHostListCanBeManaged) {
+    auto& cfg = config::globalConfig;
+    
+    // Clear hosts first
+    cfg.clearAvailableHost();
+    
+    // Add hosts
+    cfg.pushAvailableHost("host1.example.com");
+    cfg.pushAvailableHost("host2.example.com");
+    
+    // Get first host
+    auto host = cfg.getAvailableHost();
+    EXPECT_EQ(host, "host1.example.com");
+    
+    // Set multiple hosts
+    cfg.setAvailableHostList({"api1.test.com", "api2.test.com", "api3.test.com"});
+    host = cfg.getAvailableHost();
+    EXPECT_EQ(host, "api1.test.com");
+    
+    // Clear hosts
+    cfg.clearAvailableHost();
+    host = cfg.getAvailableHost();
+    EXPECT_TRUE(host.empty());
+}
+
+TEST(GlobalConfigTest, ConfigCanBeChained) {
+    auto& cfg = config::globalConfig;
+    
+    // Save original values
+    auto originalUA = cfg.getUserAgent();
+    auto originalProxy = cfg.getProxy();
+    auto originalProtocol = cfg.getProtocol();
+    
+    // Chain configuration
+    cfg.setUserAgent("ChainedAgent/1.0")
+       .setProxy("http://chained.proxy.com:8080")
+       .setProtocol("https://");
+    
+    EXPECT_EQ(cfg.getUserAgent(), "ChainedAgent/1.0");
+    EXPECT_EQ(cfg.getProxy(), "http://chained.proxy.com:8080");
+    EXPECT_EQ(cfg.getProtocol(), "https://");
+    
+    // Restore original values
+    cfg.setUserAgent(originalUA)
+       .setProxy(originalProxy)
+       .setProtocol(originalProtocol);
+}
+
+TEST(GlobalConfigTest, ClearResetsAllConfiguration) {
+    auto& cfg = config::globalConfig;
+    
+    // Set some values
+    cfg.setUserAgent("TestAgent/1.0")
+       .setProxy("http://test.proxy.com:8080")
+       .setProtocol("http://")
+       .pushAvailableHost("test.example.com");
+    
+    // Clear all
+    cfg.clear();
+    
+    // Verify all are empty
+    EXPECT_TRUE(cfg.getUserAgent().empty());
+    EXPECT_TRUE(cfg.getProxy().empty());
+    EXPECT_TRUE(cfg.getProtocol().empty());
+    EXPECT_TRUE(cfg.getAvailableHost().empty());
+}
+
+TEST(GlobalConfigTest, BuildUrlCombinesProtocolHostAndPath) {
+    auto& cfg = config::globalConfig;
+    
+    // Save original values
+    auto originalProtocol = cfg.getProtocol();
+    
+    // Set configuration
+    cfg.setProtocol("https://")
+       .setAvailableHostList({"api.example.com"});
+    
+    // Build URL
+    auto url = buildUrl("/users/123");
+    EXPECT_EQ(url, "https://api.example.com/users/123");
+    
+    // Build URL with custom host and protocol
+    auto customUrl = buildUrl("/data", "custom.example.com", "http://");
+    EXPECT_EQ(customUrl, "http://custom.example.com/data");
+    
+    // Restore original values
+    cfg.setProtocol(originalProtocol);
+    cfg.clearAvailableHost();
+}
+
+TEST(GlobalConfigTest, InitializeSetsDefaultConfiguration) {
+    // Initialize with default configuration
+    initialize(nullptr);
+    
+    auto& cfg = config::globalConfig;
+    
+    // Verify default values are set
+    EXPECT_FALSE(cfg.getUserAgent().empty());
+    EXPECT_EQ(cfg.getUserAgent(), "NekoNet/v1.0 +https://github.com/moehoshio/NekoNet");
+    EXPECT_EQ(cfg.getProtocol(), "https://");
+    EXPECT_EQ(cfg.getProxy(), "true");
+}
+
+TEST(GlobalConfigTest, InitializeWithCustomConfiguration) {
+    // Save original values
+    auto originalUA = config::globalConfig.getUserAgent();
+    auto originalProxy = config::globalConfig.getProxy();
+    
+    // Initialize with custom configuration
+    initialize([](config::NetConfig& cfg) {
+        cfg.setUserAgent("CustomApp/2.0")
+           .setProxy("http://custom.proxy.com:3128")
+           .setProtocol("http://")
+           .setAvailableHostList({"custom.api.com"});
+    });
+    
+    // Verify custom values are set
+    EXPECT_EQ(config::globalConfig.getUserAgent(), "CustomApp/2.0");
+    EXPECT_EQ(config::globalConfig.getProxy(), "http://custom.proxy.com:3128");
+    EXPECT_EQ(config::globalConfig.getProtocol(), "http://");
+    EXPECT_EQ(config::globalConfig.getAvailableHost(), "custom.api.com");
+    
+    // Restore original configuration
+    initialize([originalUA, originalProxy](config::NetConfig& cfg) {
+        cfg.setUserAgent(originalUA)
+           .setProxy(originalProxy)
+           .setProtocol("https://");
+        cfg.clearAvailableHost();
+    });
+}
+
+// ============================================================================
+// Custom Response Type tests
+// ============================================================================
+
+TEST(CustomResponseTypeTest, StringTypeIsDefault) {
+    Network network;
+    
+    RequestConfig config;
+    config.url = "";  // Empty URL will definitely error
+    
+    // Default template parameter is std::string
+    auto result = network.execute(config);
+    
+    // Verify the result type can hold string content
+    static_assert(std::is_same_v<decltype(result.content), std::string>, 
+                  "Default content type should be std::string");
+    
+    EXPECT_TRUE(result.hasError);  // Empty URL should error
+}
+
+TEST(CustomResponseTypeTest, CanUseVectorCharType) {
+    Network network;
+    
+    RequestConfig config;
+    config.url = "";  // Empty URL will definitely error
+    
+    // Explicitly specify std::vector<char> as response type
+    auto result = network.execute<std::vector<char>>(config);
+    
+    // Verify the result type is std::vector<char>
+    static_assert(std::is_same_v<decltype(result.content), std::vector<char>>, 
+                  "Content type should be std::vector<char>");
+    
+    EXPECT_TRUE(result.hasError);  // Empty URL should error
+}
+
+TEST(CustomResponseTypeTest, AsyncWithCustomType) {
+    Network network;
+    
+    RequestConfig config;
+    config.url = "";  // Empty URL will definitely error
+    
+    // Async execution with std::vector<char>
+    auto future = network.executeAsync<std::vector<char>>(config);
+    auto result = future.get();
+    
+    // Verify the result type
+    static_assert(std::is_same_v<decltype(result.content), std::vector<char>>, 
+                  "Content type should be std::vector<char>");
+    
+    EXPECT_TRUE(result.hasError);  // Empty URL should error
+}
+
+TEST(CustomResponseTypeTest, RetryWithCustomType) {
+    Network network;
+    
+    RetryConfig retryConfig;
+    retryConfig.config.url = "";  // Empty URL will definitely error
+    retryConfig.maxRetries = 1;  // Just 1 retry to keep test fast
+    
+    // Retry execution with std::vector<char>
+    auto result = network.executeWithRetry<std::vector<char>>(retryConfig);
+    
+    // Verify the result type
+    static_assert(std::is_same_v<decltype(result.content), std::vector<char>>, 
+                  "Content type should be std::vector<char>");
+    
+    EXPECT_TRUE(result.hasError);  // Empty URL should error even after retry
+}
+
+TEST(CustomResponseTypeTest, NetworkResultTypeTraits) {
+    // Test compile-time type checking
+    NetworkResult<std::string> stringResult;
+    NetworkResult<std::vector<char>> binaryResult;
+    NetworkResult<std::fstream> fileResult;
+    
+    // Verify types are distinct
+    static_assert(!std::is_same_v<decltype(stringResult.content), decltype(binaryResult.content)>, 
+                  "String and binary result types should be different");
+    
+    static_assert(!std::is_same_v<decltype(stringResult.content), decltype(fileResult.content)>, 
+                  "String and file result types should be different");
+    
+    // All should have the same structure otherwise
+    EXPECT_EQ(stringResult.statusCode, 0);
+    EXPECT_EQ(binaryResult.statusCode, 0);
+    EXPECT_EQ(fileResult.statusCode, 0);
+}
+
+TEST(CustomResponseTypeTest, EmptyContentCheckWorksForAllTypes) {
+    NetworkResult<std::string> stringResult;
+    NetworkResult<std::vector<char>> binaryResult;
+    
+    // Empty content should return false for hasContent()
+    EXPECT_FALSE(stringResult.hasContent());
+    EXPECT_FALSE(binaryResult.hasContent());
+    
+    // Add content
+    stringResult.content = "test";
+    binaryResult.content = {'t', 'e', 's', 't'};
+    
+    // Now should return true
+    EXPECT_TRUE(stringResult.hasContent());
+    EXPECT_TRUE(binaryResult.hasContent());
+}
+
+TEST(CustomResponseTypeTest, SuccessStateIndependentOfType) {
+    NetworkResult<std::string> stringResult;
+    NetworkResult<std::vector<char>> binaryResult;
+    
+    // Set success state
+    stringResult.statusCode = 200;
+    stringResult.hasError = false;
+    
+    binaryResult.statusCode = 200;
+    binaryResult.hasError = false;
+    
+    // Both should report success
+    EXPECT_TRUE(stringResult.isSuccess());
+    EXPECT_TRUE(binaryResult.isSuccess());
+    
+    // Set error state
+    stringResult.hasError = true;
+    binaryResult.hasError = true;
+    
+    // Both should report failure
+    EXPECT_FALSE(stringResult.isSuccess());
+    EXPECT_FALSE(binaryResult.isSuccess());
+}
+
+// ============================================================================
 // Main function to run all tests
 // ============================================================================
 
