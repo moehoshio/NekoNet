@@ -123,16 +123,57 @@ jobs:
       run: |
         brew install cmake ninja curl openssl zlib pkg-config
 
+    - name: Set up MSVC environment (Windows)
+      if: startsWith(matrix.config.os, 'windows') && matrix.config.cc == 'cl'
+      uses: ilammy/msvc-dev-cmd@v1.13.0
+
     - name: Setup vcpkg (Windows)
       if: startsWith(matrix.config.os, 'windows')
       run: |
-        git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
-        C:\vcpkg\bootstrap-vcpkg.bat
-        C:\vcpkg\vcpkg integrate install
-        C:\vcpkg\vcpkg install curl openssl zlib --triplet x64-windows
+        git clone --depth 1 https://github.com/Microsoft/vcpkg.git C:\vcpkg
+        C:\vcpkg\bootstrap-vcpkg.bat -disableMetrics
       shell: cmd
 
-    - name: Install dependencies (Windows)
+    - name: Cache vcpkg packages (Windows)
+      if: startsWith(matrix.config.os, 'windows')
+      uses: actions/cache@v4
+      with:
+        path: |
+          C:\vcpkg\installed
+          C:\vcpkg\packages
+        key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/vcpkg.json') }}-x64-windows
+        restore-keys: |
+          ${{ runner.os }}-vcpkg-
+
+    - name: Install dependencies via vcpkg (Windows)
+      if: startsWith(matrix.config.os, 'windows')
+      run: |
+        echo "Installing packages..."
+        C:\vcpkg\vcpkg install curl:x64-windows openssl:x64-windows zlib:x64-windows
+        echo "Integrating vcpkg..."
+        C:\vcpkg\vcpkg integrate install
+        echo "Listing installed packages..."
+        C:\vcpkg\vcpkg list
+        echo VCPKG_ROOT=C:\vcpkg >> %GITHUB_ENV%
+      shell: cmd
+
+    - name: Verify vcpkg installation (Windows)
+      if: startsWith(matrix.config.os, 'windows')
+      run: |
+        echo "=== vcpkg Information ==="
+        echo "VCPKG_ROOT: $env:VCPKG_ROOT"
+        echo "Toolchain file exists:"
+        Test-Path "C:\vcpkg\scripts\buildsystems\vcpkg.cmake"
+        echo ""
+        echo "=== Installed packages ==="
+        C:\vcpkg\vcpkg list
+        echo ""
+        echo "=== libcurl files ==="
+        Get-ChildItem "C:\vcpkg\installed\x64-windows" -Recurse -Include "*curl*" | Select-Object FullName -First 10
+      shell: pwsh
+      continue-on-error: true
+
+    - name: Install build tools (Windows)
       if: startsWith(matrix.config.os, 'windows')
       run: |
         if ("${{ matrix.config.generators }}" -eq "Ninja") {
@@ -141,24 +182,26 @@ jobs:
           choco install llvm
         }
 
-    - name: Set up MSVC environment (Windows)
-      if: startsWith(matrix.config.os, 'windows') && matrix.config.cc == 'cl'
-      uses: ilammy/msvc-dev-cmd@v1.13.0
-
-    - name: Set environment variables (Windows)
-      if: startsWith(matrix.config.os, 'windows')
-      run: |
-        echo "VCPKG_ROOT=C:\vcpkg" >> $GITHUB_ENV
-      shell: bash
-
     - name: Configure CMake
       run: |
         if [[ "${{ matrix.config.generators }}" == *"Visual Studio"* ]]; then
           # For Visual Studio generators with vcpkg on Windows
-          cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} -G "${{ matrix.config.generators }}" -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DNEKO_BUILD_TESTS=ON -DNEKO_AUTO_FETCH_DEPS=ON
+          echo "Configuring with vcpkg toolchain: C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          cmake -B build \
+            -G "${{ matrix.config.generators }}" \
+            -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -DVCPKG_TARGET_TRIPLET=x64-windows \
+            -DNEKO_BUILD_TESTS=ON \
+            -DNEKO_AUTO_FETCH_DEPS=ON
         else
           # For other generators, specify the compiler explicitly
-          cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} -DCMAKE_C_COMPILER=${{ matrix.config.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }} -G "${{ matrix.config.generators }}" -DNEKO_BUILD_TESTS=ON -DNEKO_AUTO_FETCH_DEPS=ON
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} \
+            -DCMAKE_C_COMPILER=${{ matrix.config.cc }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }} \
+            -G "${{ matrix.config.generators }}" \
+            -DNEKO_BUILD_TESTS=ON \
+            -DNEKO_AUTO_FETCH_DEPS=ON
         fi
       shell: bash
 
