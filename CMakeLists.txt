@@ -8,7 +8,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 find_package(OpenSSL)
 find_package(CURL)
-find_package(GTest QUIET)
 
 # Print configuration summary
 message(STATUS "NekoFunction configuration summary:")
@@ -68,7 +67,7 @@ if(NEKO_AUTO_FETCH_DEPS)
     )
     FetchContent_MakeAvailable(NekoLog)
 
-    if(NOT GTest_FOUND AND NEKO_BUILD_TESTS)
+    if(NEKO_BUILD_TESTS)
         message(STATUS "GTest not found. Fetching GoogleTest...")
 
         FetchContent_Declare(
@@ -113,8 +112,8 @@ if(NEKO_BUILD_TESTS)
     enable_testing()
     message(STATUS "NekoNet tests enabled")
 
-    if (NOT GTest_FOUND AND NOT NEKO_AUTO_FETCH_DEPS)
-        message(FATAL_ERROR "GTest not found. Please install GoogleTest or enable NEKO_AUTO_FETCH_DEPS to automatically fetch it.")
+    if (NOT NEKO_AUTO_FETCH_DEPS)
+        message(FATAL_ERROR "GTest is required for building tests. Please enable NEKO_AUTO_FETCH_DEPS")
     endif()
 
     add_executable(NekoNet_tests tests/network_test.cpp)
