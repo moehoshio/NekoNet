@@ -7,10 +7,10 @@ option(NEKO_BUILD_TESTS "Build tests" ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 find_package(OpenSSL)
-find_package(CURL)
+find_package(CURL REQUIRED)
 
 # Print configuration summary
-message(STATUS "NekoFunction configuration summary:")
+message(STATUS "NekoNet configuration summary:")
 message(STATUS "  - CMake version: ${CMAKE_VERSION}")
 message(STATUS "")
 message(STATUS "  - Neko Auto fetch deps: ${NEKO_AUTO_FETCH_DEPS}")
@@ -18,20 +18,27 @@ message(STATUS "  - Neko Build tests: ${NEKO_BUILD_TESTS}")
 message(STATUS "")
 message(STATUS "Dependency summary:")
 message(STATUS "  - GoogleTest support: ${GTest_FOUND}")
-message(STATUS "  - OpenSSL support: ${OpenSSL_FOUND}")
+message(STATUS "  - OpenSSL support: ${OPENSSL_FOUND}")
 message(STATUS "  - libcurl support: ${CURL_FOUND}")
 message(STATUS "")
 
-
-if (NOT OPENSSL_FOUND)
-    message(FATAL_ERROR "OpenSSL not found ; if you installed it, you may need to set OPENSSL_ROOT_DIR or -DCMAKE_PREFIX_PATH=<path>")
-endif()
-
+# Check SSL backend requirements
 if (NOT CURL_FOUND)
     message(FATAL_ERROR "libcurl not found ; if you installed it, you may need to set CURL_ROOT_DIR or -DCMAKE_PREFIX_PATH=<path>")
 endif()
 
-message(STATUS "Found OpenSSL ${OPENSSL_VERSION}")
+# On Windows, OpenSSL is optional if using Schannel (native SSL)
+# On other platforms, OpenSSL is required
+if (NOT WIN32 AND NOT OPENSSL_FOUND)
+    message(FATAL_ERROR "OpenSSL not found ; if you installed it, you may need to set OPENSSL_ROOT_DIR or -DCMAKE_PREFIX_PATH=<path>")
+endif()
+
+if (OPENSSL_FOUND)
+    message(STATUS "Found OpenSSL ${OPENSSL_VERSION}")
+elseif(WIN32)
+    message(STATUS "OpenSSL not found - using Windows Schannel (native SSL)")
+endif()
+
 message(STATUS "Found libcurl ${CURL_VERSION_STRING}")
 
 if(NEKO_AUTO_FETCH_DEPS)
@@ -95,11 +102,36 @@ target_include_directories(NekoNet PUBLIC
 target_link_libraries(NekoNet PUBLIC
     # Neko
     NekoSchema NekoLog NekoFunction NekoSystem
-    # OpenSSL
-    OpenSSL::SSL OpenSSL::Crypto
     # libcurl
     CURL::libcurl
 )
+
+# Link OpenSSL if found (optional on Windows when using Schannel)
+if(OPENSSL_FOUND)
+    target_link_libraries(NekoNet PUBLIC
+        OpenSSL::SSL OpenSSL::Crypto
+    )
+    
+    # On Windows with OpenSSL static linking, additional system libraries are required
+    if(WIN32 AND VCPKG_TARGET_TRIPLET MATCHES "static")
+        target_link_libraries(NekoNet PUBLIC
+            Crypt32
+            ws2_32
+            advapi32
+            user32
+            bcrypt
+        )
+        message(STATUS "Linking Windows system libraries for OpenSSL static build")
+    endif()
+else()
+    # Using native SSL (Schannel on Windows)
+    if(WIN32)
+        target_link_libraries(NekoNet PUBLIC
+            ws2_32  # Windows Sockets
+        )
+        message(STATUS "Using Windows Schannel - minimal system libraries linked")
+    endif()
+endif()
 
 target_compile_features(NekoNet PUBLIC cxx_std_20)
 
