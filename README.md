@@ -929,7 +929,7 @@ You can run the tests to verify that everything is working correctly.
 If you haven't configured the build yet, please run:
 
 ```shell
-cmake -B ./build . -DNEKO_BUILD_TESTS=ON -DNEKO_AUTO_FETCH_DEPS=ON
+cmake -B ./build . -DNEKO_NET_BUILD_TESTS=ON -DNEKO_NET_AUTO_FETCH_DEPS=ON -S .
 ```
 
 Now, you can build the test files (you must build them manually at least once before running the tests!).
@@ -966,7 +966,7 @@ Total Test time (real) =   0.15 sec
 If you want to disable building and running tests, you can set the following CMake option when configuring your project:
 
 ```shell
-cmake -B ./build . -DNEKO_BUILD_TESTS=OFF
+cmake -B ./build . -DNEKO_NET_BUILD_TESTS=OFF -S .
 ```
 
 This will skip test targets during the build process.
@@ -985,6 +985,7 @@ For more detailed information, please refer to:
 
 ## See More
 
+- [NekoNet](https://github.com/moehoshio/NekoNet): A modern , easy-to-use C++20 networking library via libcurl.
 - [NekoLog](https://github.com/moehoshio/NekoLog): An easy-to-use, modern, lightweight, and efficient C++20 logging library.
 - [NekoEvent](https://github.com/moehoshio/NekoEvent): A modern easy to use type-safe and high-performance event handling system for C++.
 - [NekoSchema](https://github.com/moehoshio/NekoSchema): A lightweight, header-only C++20 schema library.
