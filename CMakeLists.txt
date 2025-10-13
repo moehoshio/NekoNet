@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
 project(NekoNet VERSION 1.0 LANGUAGES CXX)
 
-option(NEKO_AUTO_FETCH_DEPS "Automatically fetch dependencies" ON)
-option(NEKO_BUILD_TESTS "Build tests" ON)
+# ================
+# ==== Config ====
+# ================
+option(NEKO_LOG_AUTO_FETCH_DEPS "Neko Log Automatically fetch dependencies" ON)
+option(NEKO_LOG_BUILD_TESTS "Neko Log Build tests" ON)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -11,15 +14,15 @@ find_package(CURL REQUIRED)
 
 # Print configuration summary
 message(STATUS "NekoNet configuration summary:")
+message(STATUS "Start configuration Neko Net...")
 message(STATUS "  - CMake version: ${CMAKE_VERSION}")
 message(STATUS "")
-message(STATUS "  - Neko Auto fetch deps: ${NEKO_AUTO_FETCH_DEPS}")
-message(STATUS "  - Neko Build tests: ${NEKO_BUILD_TESTS}")
+message(STATUS "  - Neko Log Auto fetch deps: ${NEKO_LOG_AUTO_FETCH_DEPS}")
+message(STATUS "  - Neko Log Build tests: ${NEKO_LOG_BUILD_TESTS}")
 message(STATUS "")
 message(STATUS "Dependency summary:")
-message(STATUS "  - GoogleTest support: ${GTest_FOUND}")
-message(STATUS "  - OpenSSL support: ${OPENSSL_FOUND}")
-message(STATUS "  - libcurl support: ${CURL_FOUND}")
+message(STATUS "  - OpenSSL support: ${OPENSSL_FOUND} version: ${OPENSSL_VERSION}")
+message(STATUS "  - libcurl support: ${CURL_FOUND} version: ${CURL_VERSION_STRING}")
 message(STATUS "")
 
 # Check SSL backend requirements
@@ -41,7 +44,7 @@ endif()
 
 message(STATUS "Found libcurl ${CURL_VERSION_STRING}")
 
-if(NEKO_AUTO_FETCH_DEPS)
+if(NEKO_LOG_AUTO_FETCH_DEPS)
 
     include(FetchContent)
 
@@ -74,8 +77,8 @@ if(NEKO_AUTO_FETCH_DEPS)
     )
     FetchContent_MakeAvailable(NekoLog)
 
-    if(NEKO_BUILD_TESTS)
-        message(STATUS "GTest not found. Fetching GoogleTest...")
+    if(NEKO_LOG_BUILD_TESTS)
+        message(STATUS "Neko Log Fetching GoogleTest...")
 
         FetchContent_Declare(
             googletest
@@ -87,8 +90,11 @@ if(NEKO_AUTO_FETCH_DEPS)
         FetchContent_MakeAvailable(googletest)
     endif()
 
-endif(NEKO_AUTO_FETCH_DEPS)
+endif()
 
+# ================
+# = Main Target =
+# ================
 
 add_library(NekoNet STATIC src/neko/network/network.cpp)
 add_library(Neko::Net ALIAS NekoNet)
@@ -139,13 +145,16 @@ if(MSVC)
     target_compile_options(NekoNet PUBLIC /Zc:__cplusplus)
 endif()
 
+# ================
+# ===== Test =====
+# ================
 
-if(NEKO_BUILD_TESTS)
+if(NEKO_LOG_BUILD_TESTS)
     enable_testing()
     message(STATUS "NekoNet tests enabled")
 
-    if (NOT NEKO_AUTO_FETCH_DEPS)
-        message(FATAL_ERROR "GTest is required for building tests. Please enable NEKO_AUTO_FETCH_DEPS")
+    if (NOT NEKO_LOG_AUTO_FETCH_DEPS)
+        message(FATAL_ERROR "GTest is required for building tests. Please enable NEKO_LOG_AUTO_FETCH_DEPS")
     endif()
 
     add_executable(NekoNet_tests tests/network_test.cpp)
@@ -165,5 +174,7 @@ if(NEKO_BUILD_TESTS)
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
 else()
-    message(STATUS "NekoNet tests disabled (NEKO_BUILD_TESTS=OFF)")
+    message(STATUS "NekoNet tests disabled (NEKO_LOG_BUILD_TESTS=OFF)")
 endif()
+
+message(STATUS "End configuration Neko Net.")
