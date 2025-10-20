@@ -92,6 +92,32 @@ jobs:
           zlib1g-dev \
           pkg-config
         
+        # Try to install minizip-ng (may not be available on all Ubuntu versions)
+        sudo apt-get install -y libminizip-ng-dev || \
+          sudo apt-get install -y libminizip-dev || \
+          echo "Neither libminizip-ng-dev nor libminizip-dev available, will try building from source"
+        
+        # If minizip-ng is not available via apt, build from source
+        if ! pkg-config --exists minizip-ng && ! pkg-config --exists minizip; then
+          echo "Building minizip-ng from source..."
+          cd /tmp
+          git clone --depth 1 --branch 4.0.7 https://github.com/zlib-ng/minizip-ng.git
+          cd minizip-ng
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DMZ_COMPAT=OFF \
+            -DMZ_ZLIB=ON \
+            -DMZ_BZIP2=OFF \
+            -DMZ_LZMA=OFF \
+            -DMZ_ZSTD=OFF \
+            -DMZ_OPENSSL=OFF \
+            -DMZ_FETCH_LIBS=OFF
+          cmake --build build --parallel
+          sudo cmake --install build
+          cd $GITHUB_WORKSPACE
+        fi
+        
         # Install GCC-13 from toolchain PPA
         if [[ "${{ matrix.config.cxx }}" == g++-13 ]]; then
           sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
@@ -117,11 +143,43 @@ jobs:
         echo '#include <version>' | ${{ matrix.config.cxx }} -std=c++20 -x c++ -E - 2>/dev/null && echo "C++20 headers available" || echo "C++20 headers missing"
         echo '#include <source_location>' | ${{ matrix.config.cxx }} -std=c++20 -x c++ -E - 2>/dev/null && echo "source_location available" || echo "source_location missing"
         echo '#include <format>' | ${{ matrix.config.cxx }} -std=c++20 -x c++ -E - 2>/dev/null && echo "format available" || echo "format missing"
+        echo "=== pkg-config check ==="
+        pkg-config --modversion libcurl || echo "libcurl not found via pkg-config"
+        pkg-config --modversion openssl || echo "openssl not found via pkg-config"
+        pkg-config --cflags libcurl || echo "libcurl cflags not available"
+        pkg-config --libs libcurl || echo "libcurl libs not available"
+        echo "=== minizip-ng check ==="
+        pkg-config --modversion minizip-ng || echo "minizip-ng not found via pkg-config"
+        pkg-config --modversion minizip || echo "minizip not found via pkg-config"
+        pkg-config --cflags minizip-ng || pkg-config --cflags minizip || echo "minizip cflags not available"
+        echo "=== CMake minizip-ng check ==="
+        cmake --find-package -DNAME=minizip-ng -DCOMPILER_ID=GNU -DLANGUAGE=C -DMODE=EXIST || echo "minizip-ng not found by CMake"
+      continue-on-error: true
 
     - name: Install dependencies (macOS)
       if: startsWith(matrix.config.os, 'macos')
       run: |
-        brew install cmake ninja curl openssl zlib pkg-config
+        brew install cmake ninja curl openssl zlib pkg-config minizip-ng
+
+    - name: Verify dependencies (macOS)
+      if: startsWith(matrix.config.os, 'macos')
+      run: |
+        echo "=== Homebrew prefix ==="
+        brew --prefix
+        echo ""
+        echo "=== curl location ==="
+        brew --prefix curl
+        ls -la $(brew --prefix curl)/lib/pkgconfig/ || true
+        echo ""
+        echo "=== openssl location ==="
+        brew --prefix openssl
+        brew --prefix openssl@3
+        ls -la $(brew --prefix openssl@3)/lib/pkgconfig/ || true
+        echo ""
+        echo "=== pkg-config test ==="
+        PKG_CONFIG_PATH="$(brew --prefix)/opt/curl/lib/pkgconfig:$(brew --prefix)/opt/openssl@3/lib/pkgconfig" pkg-config --modversion libcurl || true
+        PKG_CONFIG_PATH="$(brew --prefix)/opt/curl/lib/pkgconfig:$(brew --prefix)/opt/openssl@3/lib/pkgconfig" pkg-config --modversion openssl || true
+      continue-on-error: true
 
     - name: Set up MSVC environment (Windows)
       if: startsWith(matrix.config.os, 'windows') && matrix.config.cc == 'cl'
@@ -149,7 +207,7 @@ jobs:
       if: startsWith(matrix.config.os, 'windows')
       run: |
         echo "Installing packages..."
-        C:\vcpkg\vcpkg install curl:x64-windows openssl:x64-windows zlib:x64-windows
+        C:\vcpkg\vcpkg install curl:x64-windows openssl:x64-windows zlib:x64-windows minizip-ng:x64-windows
         echo "Integrating vcpkg..."
         C:\vcpkg\vcpkg integrate install
         echo "Listing installed packages..."
@@ -193,13 +251,37 @@ jobs:
             -DVCPKG_TARGET_TRIPLET=x64-windows \
             -DNEKO_BUILD_TESTS=ON \
             -DNEKO_AUTO_FETCH_DEPS=ON
-        else
-          # For other generators, specify the compiler explicitly
+        elif [[ "${{ runner.os }}" == "macOS" ]]; then
+          # For macOS, set prefix path for Homebrew packages
+          # Support both Apple Silicon (/opt/homebrew) and Intel (/usr/local)
+          if [[ -d "/opt/homebrew" ]]; then
+            BREW_PREFIX="/opt/homebrew"
+          else
+            BREW_PREFIX="/usr/local"
+          fi
+          echo "Using Homebrew prefix: $BREW_PREFIX"
+          
+          # Set PKG_CONFIG_PATH for finding curl and openssl
+          export PKG_CONFIG_PATH="$BREW_PREFIX/opt/curl/lib/pkgconfig:$BREW_PREFIX/opt/openssl@3/lib/pkgconfig:$BREW_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+          
           cmake -B build \
             -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} \
             -DCMAKE_C_COMPILER=${{ matrix.config.cc }} \
             -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }} \
             -G "${{ matrix.config.generators }}" \
+            -DCMAKE_PREFIX_PATH="$BREW_PREFIX;$BREW_PREFIX/opt/curl;$BREW_PREFIX/opt/openssl@3" \
+            -DOPENSSL_ROOT_DIR="$BREW_PREFIX/opt/openssl@3" \
+            -DNEKO_BUILD_TESTS=ON \
+            -DNEKO_AUTO_FETCH_DEPS=ON
+        else
+          # For other generators (Linux), specify the compiler explicitly
+          # Add /usr/local to CMAKE_PREFIX_PATH for packages built from source
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} \
+            -DCMAKE_C_COMPILER=${{ matrix.config.cc }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }} \
+            -G "${{ matrix.config.generators }}" \
+            -DCMAKE_PREFIX_PATH="/usr/local;/usr" \
             -DNEKO_BUILD_TESTS=ON \
             -DNEKO_AUTO_FETCH_DEPS=ON
         fi

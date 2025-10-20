@@ -12,19 +12,44 @@ set(NEKO_NET_LIBRARY_PATH "" CACHE PATH "Path to look for dependencies (OpenSSL,
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 if (DEFINED NEKO_NET_LIBRARY_PATH)
-    find_package(OpenSSL
+    # Try CONFIG mode first for vcpkg/custom installations
+    find_package(OpenSSL CONFIG QUIET
         HINTS "${NEKO_NET_LIBRARY_PATH}"
     )
-    find_package(CURL REQUIRED
+    if(NOT OPENSSL_FOUND)
+        set(CMAKE_PREFIX_PATH "${NEKO_NET_LIBRARY_PATH}" ${CMAKE_PREFIX_PATH})
+        find_package(OpenSSL MODULE)
+    endif()
+    
+    find_package(CURL CONFIG QUIET
         HINTS "${NEKO_NET_LIBRARY_PATH}"
     )
+    # Fall back to MODULE mode if CONFIG mode fails
+    if(NOT CURL_FOUND)
+        # For MODULE mode, set CMAKE_PREFIX_PATH instead of using HINTS
+        set(CMAKE_PREFIX_PATH "${NEKO_NET_LIBRARY_PATH}" ${CMAKE_PREFIX_PATH})
+        find_package(CURL MODULE)
+    endif()
     find_package(GTest CONFIG 
         HINTS "${NEKO_NET_LIBRARY_PATH}"
         QUIET
     )
 else()
-    find_package(OpenSSL)
-    find_package(CURL REQUIRED)
+    # Try CONFIG mode first (for vcpkg on Windows)
+    find_package(OpenSSL CONFIG QUIET)
+    # Fall back to MODULE mode for system packages (Linux/macOS)
+    if(NOT OPENSSL_FOUND)
+        message(STATUS "OpenSSL not found in CONFIG mode, trying MODULE mode...")
+        find_package(OpenSSL MODULE)
+    endif()
+    
+    # Try CONFIG mode first (for vcpkg on Windows)
+    find_package(CURL CONFIG QUIET)
+    # Fall back to MODULE mode for system packages (Linux/macOS)
+    if(NOT CURL_FOUND)
+        message(STATUS "CURL not found in CONFIG mode, trying MODULE mode...")
+        find_package(CURL MODULE REQUIRED)
+    endif()
     find_package(GTest CONFIG QUIET)
 endif()
 
@@ -47,6 +72,20 @@ message(STATUS "")
 # Check SSL backend requirements
 if (NOT CURL_FOUND)
     message(FATAL_ERROR "libcurl not found ; if you installed it, you may need to set CURL_ROOT_DIR or -DCMAKE_PREFIX_PATH=<path>")
+endif()
+
+# Create CURL::libcurl target if it doesn't exist (for older FindCURL.cmake)
+if(CURL_FOUND AND NOT TARGET CURL::libcurl)
+    add_library(CURL::libcurl UNKNOWN IMPORTED)
+    set_target_properties(CURL::libcurl PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${CURL_INCLUDE_DIRS}"
+        IMPORTED_LOCATION "${CURL_LIBRARIES}"
+    )
+    if(CURL_LIBRARY)
+        set_target_properties(CURL::libcurl PROPERTIES
+            IMPORTED_LOCATION "${CURL_LIBRARY}"
+        )
+    endif()
 endif()
 
 # On Windows, OpenSSL is optional if using Schannel (native SSL)
@@ -79,6 +118,13 @@ if(NEKO_NET_AUTO_FETCH_DEPS)
         GIT_REPOSITORY https://github.com/moehoshio/NekoFunction.git
         GIT_TAG        main
     )
+    
+    # Pass CMAKE_PREFIX_PATH to NekoFunction so it can find minizip-ng
+    # On Linux, the package might be called minizip instead of minizip-ng
+    if(CMAKE_PREFIX_PATH)
+        set(NEKO_FUNCTION_CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH})
+    endif()
+    
     FetchContent_MakeAvailable(NekoFunction)
 
     FetchContent_Declare(
