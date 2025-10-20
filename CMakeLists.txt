@@ -4,25 +4,44 @@ project(NekoNet VERSION 1.0 LANGUAGES CXX)
 # ================
 # ==== Config ====
 # ================
-option(NEKO_LOG_AUTO_FETCH_DEPS "Neko Log Automatically fetch dependencies" ON)
-option(NEKO_LOG_BUILD_TESTS "Neko Log Build tests" ON)
+option(NEKO_NET_AUTO_FETCH_DEPS "Neko Net Automatically fetch dependencies" ON)
+option(NEKO_NET_BUILD_TESTS "Neko Net Build tests" ON)
+
+set(NEKO_NET_LIBRARY_PATH "" CACHE PATH "Path to look for dependencies (OpenSSL, libcurl, GTest)")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-find_package(OpenSSL)
-find_package(CURL REQUIRED)
+if (DEFINED NEKO_NET_LIBRARY_PATH)
+    find_package(OpenSSL
+        HINTS "${NEKO_NET_LIBRARY_PATH}"
+    )
+    find_package(CURL REQUIRED
+        HINTS "${NEKO_NET_LIBRARY_PATH}"
+    )
+    find_package(GTest CONFIG 
+        HINTS "${NEKO_NET_LIBRARY_PATH}"
+        QUIET
+    )
+else()
+    find_package(OpenSSL)
+    find_package(CURL REQUIRED)
+    find_package(GTest CONFIG QUIET)
+endif()
 
 # Print configuration summary
-message(STATUS "NekoNet configuration summary:")
 message(STATUS "Start configuration Neko Net...")
+message(STATUS "")
+message(STATUS "NekoNet configuration summary:")
+message(STATUS "")
 message(STATUS "  - CMake version: ${CMAKE_VERSION}")
 message(STATUS "")
-message(STATUS "  - Neko Log Auto fetch deps: ${NEKO_LOG_AUTO_FETCH_DEPS}")
-message(STATUS "  - Neko Log Build tests: ${NEKO_LOG_BUILD_TESTS}")
+message(STATUS "  - Neko Net Auto fetch deps: ${NEKO_NET_AUTO_FETCH_DEPS}")
+message(STATUS "  - Neko Net Build tests: ${NEKO_NET_BUILD_TESTS}")
 message(STATUS "")
 message(STATUS "Dependency summary:")
 message(STATUS "  - OpenSSL support: ${OPENSSL_FOUND} version: ${OPENSSL_VERSION}")
 message(STATUS "  - libcurl support: ${CURL_FOUND} version: ${CURL_VERSION_STRING}")
+message(STATUS "  - GTest : ${GTest_FOUND} version : ${GTest_VERSION}")
 message(STATUS "")
 
 # Check SSL backend requirements
@@ -44,7 +63,7 @@ endif()
 
 message(STATUS "Found libcurl ${CURL_VERSION_STRING}")
 
-if(NEKO_LOG_AUTO_FETCH_DEPS)
+if(NEKO_NET_AUTO_FETCH_DEPS)
 
     include(FetchContent)
 
@@ -77,8 +96,8 @@ if(NEKO_LOG_AUTO_FETCH_DEPS)
     )
     FetchContent_MakeAvailable(NekoLog)
 
-    if(NEKO_LOG_BUILD_TESTS)
-        message(STATUS "Neko Log Fetching GoogleTest...")
+    if(NOT GTEST_FOUND AND NEKO_NET_BUILD_TESTS)
+        message(STATUS "GTest not found; Neko Net Fetching GoogleTest...")
 
         FetchContent_Declare(
             googletest
@@ -114,10 +133,8 @@ target_link_libraries(NekoNet PUBLIC
 
 # Link OpenSSL if found (optional on Windows when using Schannel)
 if(OPENSSL_FOUND)
-    target_link_libraries(NekoNet PUBLIC
-        OpenSSL::SSL OpenSSL::Crypto
-    )
-    
+    target_link_libraries(NekoNet PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+
     # On Windows with OpenSSL static linking, additional system libraries are required
     if(WIN32 AND VCPKG_TARGET_TRIPLET MATCHES "static")
         target_link_libraries(NekoNet PUBLIC
@@ -149,17 +166,18 @@ endif()
 # ===== Test =====
 # ================
 
-if(NEKO_LOG_BUILD_TESTS)
+if(NEKO_NET_BUILD_TESTS)
     enable_testing()
-    message(STATUS "NekoNet tests enabled")
+    message(STATUS "NekoNet tests enabled (NEKO_NET_BUILD_TESTS=ON)")
 
-    if (NOT NEKO_LOG_AUTO_FETCH_DEPS)
-        message(FATAL_ERROR "GTest is required for building tests. Please enable NEKO_LOG_AUTO_FETCH_DEPS")
+    if (NOT GTEST_FOUND AND NOT NEKO_NET_AUTO_FETCH_DEPS)
+        message(STATUS "GTest is required for building tests but was not found.")
+        message(FATAL_ERROR "Please enable -DNEKO_NET_AUTO_FETCH_DEPS=ON or install GTest and make it discoverable by CMake. e.g -DCMAKE_PREFIX_PATH=</path/to/googletest>")
     endif()
 
     add_executable(NekoNet_tests tests/network_test.cpp)
     target_include_directories(NekoNet_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-    target_link_libraries(NekoNet_tests PRIVATE NekoNet gtest gtest_main)
+    target_link_libraries(NekoNet_tests PRIVATE NekoNet GTest::gtest GTest::gtest_main)
     target_compile_features(NekoNet_tests PRIVATE cxx_std_20)
 
     # Automatically copy runtime libraries (DLLs on Windows, .so on Linux, .dylib on macOS)
@@ -174,7 +192,7 @@ if(NEKO_LOG_BUILD_TESTS)
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
 else()
-    message(STATUS "NekoNet tests disabled (NEKO_LOG_BUILD_TESTS=OFF)")
+    message(STATUS "NekoNet tests disabled (NEKO_NET_BUILD_TESTS=OFF)")
 endif()
 
-message(STATUS "End configuration Neko Net.")
+message(STATUS "Neko Net End of configuration")

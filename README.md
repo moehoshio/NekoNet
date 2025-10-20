@@ -26,8 +26,10 @@ Neko Network (NekoNet) is a modern, easy-to-use, and efficient C++20 network lib
 
 ## Requirements
 
+
 - C++20 or higher compatible compiler
 - CMake 3.16 or higher
+- Git
 - libcurl (with OpenSSL support)
 - OpenSSL
 
