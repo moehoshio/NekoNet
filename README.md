@@ -67,7 +67,7 @@ NekoNet depends on the following libraries:
 ## Quick Start
 
 Configure:
-[CMake](#cmake) | [Tests](#testing)
+[CMake](#cmake) | [Static Linking](#static-linking) | [Tests](#testing)
 
 Example:
 [Basic](#basic-example) | [GET Request](#get-request) | [POST Request](#post-request) | [Download File](#download-file) | [Async Request](#asynchronous-requests)
@@ -100,6 +100,27 @@ target_link_libraries(your_target PRIVATE Neko::Net)
 
 ```cpp
 #include <neko/network/network.hpp>
+```
+
+3. Let CMake find libcurl and OpenSSL (if you have already installed the dependencies)
+
+```bash
+cmake -B ./build . -DNEKO_NET_LIBRARY_PATH="/path/to/" -S .
+```
+
+or
+
+```bash
+cmake -B ./build . -DCMAKE_PREFIX_PATH="/path/to/" -S .
+```
+
+### Static Linking
+
+If you want to use static linking, make sure all libraries (OpenSSL, libcurl..) are built as static libraries. (NekoNet itself is always a static library)
+Enable the static linking option in your CMake configuration:
+
+```bash
+cmake -B ./build . -DNEKO_NET_STATIC_LINK=ON -DNEKO_NET_LIBRARY_PATH="/path/to/x64-windows-static" -S .
 ```
 
 ### Basic Example

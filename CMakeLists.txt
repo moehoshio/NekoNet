@@ -4,54 +4,23 @@ project(NekoNet VERSION 1.0 LANGUAGES CXX)
 # ================
 # ==== Config ====
 # ================
+
 option(NEKO_NET_AUTO_FETCH_DEPS "Neko Net Automatically fetch dependencies" ON)
 option(NEKO_NET_BUILD_TESTS "Neko Net Build tests" ON)
+option(NEKO_NET_STATIC_LINK "Neko Net Static Link library" OFF)
 
 set(NEKO_NET_LIBRARY_PATH "" CACHE PATH "Path to look for dependencies (OpenSSL, libcurl, GTest)")
 
+if(NEKO_NET_LIBRARY_PATH)
+    list(APPEND CMAKE_PREFIX_PATH ${NEKO_NET_LIBRARY_PATH})
+endif(NEKO_NET_LIBRARY_PATH)
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-if (DEFINED NEKO_NET_LIBRARY_PATH)
-    # Try CONFIG mode first for vcpkg/custom installations
-    find_package(OpenSSL CONFIG QUIET
-        HINTS "${NEKO_NET_LIBRARY_PATH}"
-    )
-    if(NOT OPENSSL_FOUND)
-        set(CMAKE_PREFIX_PATH "${NEKO_NET_LIBRARY_PATH}" ${CMAKE_PREFIX_PATH})
-        find_package(OpenSSL MODULE)
-    endif()
-    
-    find_package(CURL CONFIG QUIET
-        HINTS "${NEKO_NET_LIBRARY_PATH}"
-    )
-    # Fall back to MODULE mode if CONFIG mode fails
-    if(NOT CURL_FOUND)
-        # For MODULE mode, set CMAKE_PREFIX_PATH instead of using HINTS
-        set(CMAKE_PREFIX_PATH "${NEKO_NET_LIBRARY_PATH}" ${CMAKE_PREFIX_PATH})
-        find_package(CURL MODULE)
-    endif()
-    find_package(GTest CONFIG 
-        HINTS "${NEKO_NET_LIBRARY_PATH}"
-        QUIET
-    )
-else()
-    # Try CONFIG mode first (for vcpkg on Windows)
-    find_package(OpenSSL CONFIG QUIET)
-    # Fall back to MODULE mode for system packages (Linux/macOS)
-    if(NOT OPENSSL_FOUND)
-        message(STATUS "OpenSSL not found in CONFIG mode, trying MODULE mode...")
-        find_package(OpenSSL MODULE)
-    endif()
-    
-    # Try CONFIG mode first (for vcpkg on Windows)
-    find_package(CURL CONFIG QUIET)
-    # Fall back to MODULE mode for system packages (Linux/macOS)
-    if(NOT CURL_FOUND)
-        message(STATUS "CURL not found in CONFIG mode, trying MODULE mode...")
-        find_package(CURL MODULE REQUIRED)
-    endif()
-    find_package(GTest CONFIG QUIET)
-endif()
+find_package(OpenSSL QUIET)
+find_package(CURL REQUIRED)
+find_package(GTest QUIET)
+
 
 # Print configuration summary
 message(STATUS "Start configuration Neko Net...")
@@ -59,9 +28,12 @@ message(STATUS "")
 message(STATUS "NekoNet configuration summary:")
 message(STATUS "")
 message(STATUS "  - CMake version: ${CMAKE_VERSION}")
+message(STATUS "  - Neko Net Library Path: ${NEKO_NET_LIBRARY_PATH}")
+message(STATUS "  - CMake Prefix Path: ${CMAKE_PREFIX_PATH}")
 message(STATUS "")
 message(STATUS "  - Neko Net Auto fetch deps: ${NEKO_NET_AUTO_FETCH_DEPS}")
 message(STATUS "  - Neko Net Build tests: ${NEKO_NET_BUILD_TESTS}")
+message(STATUS "  - Neko Net Static Link library: ${NEKO_NET_STATIC_LINK}")
 message(STATUS "")
 message(STATUS "Dependency summary:")
 message(STATUS "  - OpenSSL support: ${OPENSSL_FOUND} version: ${OPENSSL_VERSION}")
@@ -69,9 +41,14 @@ message(STATUS "  - libcurl support: ${CURL_FOUND} version: ${CURL_VERSION_STRIN
 message(STATUS "  - GTest : ${GTest_FOUND} version : ${GTest_VERSION}")
 message(STATUS "")
 
-# Check SSL backend requirements
 if (NOT CURL_FOUND)
-    message(FATAL_ERROR "libcurl not found ; if you installed it, you may need to set CURL_ROOT_DIR or -DCMAKE_PREFIX_PATH=<path>")
+    message(FATAL_ERROR "Neko Net not found libcurl ; if you installed it, you may need to set -DNEKO_NET_LIBRARY_PATH=<path> or -DCMAKE_PREFIX_PATH=<path>")
+endif()
+
+# On Windows, OpenSSL is optional if using Schannel (native SSL)
+# On other platforms, OpenSSL is required
+if (NOT WIN32 AND NOT OPENSSL_FOUND)
+    message(FATAL_ERROR "Neko Net not found OpenSSL ; if you installed it, you may need to set -DNEKO_NET_LIBRARY_PATH=<path> or -DCMAKE_PREFIX_PATH=<path>")
 endif()
 
 # Create CURL::libcurl target if it doesn't exist (for older FindCURL.cmake)
@@ -87,20 +64,6 @@ if(CURL_FOUND AND NOT TARGET CURL::libcurl)
         )
     endif()
 endif()
-
-# On Windows, OpenSSL is optional if using Schannel (native SSL)
-# On other platforms, OpenSSL is required
-if (NOT WIN32 AND NOT OPENSSL_FOUND)
-    message(FATAL_ERROR "OpenSSL not found ; if you installed it, you may need to set OPENSSL_ROOT_DIR or -DCMAKE_PREFIX_PATH=<path>")
-endif()
-
-if (OPENSSL_FOUND)
-    message(STATUS "Found OpenSSL ${OPENSSL_VERSION}")
-elseif(WIN32)
-    message(STATUS "OpenSSL not found - using Windows Schannel (native SSL)")
-endif()
-
-message(STATUS "Found libcurl ${CURL_VERSION_STRING}")
 
 if(NEKO_NET_AUTO_FETCH_DEPS)
 
@@ -118,13 +81,7 @@ if(NEKO_NET_AUTO_FETCH_DEPS)
         GIT_REPOSITORY https://github.com/moehoshio/NekoFunction.git
         GIT_TAG        main
     )
-    
-    # Pass CMAKE_PREFIX_PATH to NekoFunction so it can find minizip-ng
-    # On Linux, the package might be called minizip instead of minizip-ng
-    if(CMAKE_PREFIX_PATH)
-        set(NEKO_FUNCTION_CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH})
-    endif()
-    
+    set(NEKO_FUNCTION_LIBRARY_PATH ${CMAKE_PREFIX_PATH})
     FetchContent_MakeAvailable(NekoFunction)
 
     FetchContent_Declare(
@@ -143,12 +100,12 @@ if(NEKO_NET_AUTO_FETCH_DEPS)
     FetchContent_MakeAvailable(NekoLog)
 
     if(NOT GTEST_FOUND AND NEKO_NET_BUILD_TESTS)
-        message(STATUS "GTest not found; Neko Net Fetching GoogleTest...")
+        message(STATUS "GTest not found; Neko Net is Fetching GoogleTest...")
 
         FetchContent_Declare(
             googletest
             GIT_REPOSITORY https://github.com/google/googletest.git
-            GIT_TAG        release-1.12.1
+            GIT_TAG        v1.17.0
         )
         # For Windows: Prevent overriding the parent project's compiler/linker settings
         set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -176,36 +133,30 @@ target_link_libraries(NekoNet PUBLIC
     # libcurl
     CURL::libcurl
 )
+target_compile_features(NekoNet PUBLIC cxx_std_20)
+
+if(WIN32)
+    target_link_libraries(NekoNet PUBLIC ws2_32) # Windows Sockets
+endif()
+
+if(MSVC)
+    target_compile_options(NekoNet PUBLIC /Zc:__cplusplus)
+endif()
 
 # Link OpenSSL if found (optional on Windows when using Schannel)
 if(OPENSSL_FOUND)
     target_link_libraries(NekoNet PUBLIC OpenSSL::SSL OpenSSL::Crypto)
 
     # On Windows with OpenSSL static linking, additional system libraries are required
-    if(WIN32 AND VCPKG_TARGET_TRIPLET MATCHES "static")
+    if(WIN32 AND NEKO_NET_STATIC_LINK)
         target_link_libraries(NekoNet PUBLIC
             Crypt32
-            ws2_32
             advapi32
             user32
             bcrypt
         )
         message(STATUS "Linking Windows system libraries for OpenSSL static build")
     endif()
-else()
-    # Using native SSL (Schannel on Windows)
-    if(WIN32)
-        target_link_libraries(NekoNet PUBLIC
-            ws2_32  # Windows Sockets
-        )
-        message(STATUS "Using Windows Schannel - minimal system libraries linked")
-    endif()
-endif()
-
-target_compile_features(NekoNet PUBLIC cxx_std_20)
-
-if(MSVC)
-    target_compile_options(NekoNet PUBLIC /Zc:__cplusplus)
 endif()
 
 # ================
@@ -217,8 +168,8 @@ if(NEKO_NET_BUILD_TESTS)
     message(STATUS "NekoNet tests enabled (NEKO_NET_BUILD_TESTS=ON)")
 
     if (NOT GTEST_FOUND AND NOT NEKO_NET_AUTO_FETCH_DEPS)
-        message(STATUS "GTest is required for building tests but was not found.")
-        message(FATAL_ERROR "Please enable -DNEKO_NET_AUTO_FETCH_DEPS=ON or install GTest and make it discoverable by CMake. e.g -DCMAKE_PREFIX_PATH=</path/to/googletest>")
+        message(WARNING "GTest is required for building tests but was not found.")
+        message(FATAL_ERROR "Please enable -DNEKO_NET_AUTO_FETCH_DEPS=ON or install GTest and make it discoverable by CMake. use -DNEKO_NET_LIBRARY_PATH=</path/to/gtest>")
     endif()
 
     add_executable(NekoNet_tests tests/network_test.cpp)
