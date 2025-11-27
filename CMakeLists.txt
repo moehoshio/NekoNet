@@ -1,54 +1,62 @@
-cmake_minimum_required(VERSION 3.16)
-project(NekoNet VERSION 1.0 LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.15)
+project(NekoNetwork VERSION 1.0.0 LANGUAGES CXX)
 
 # ================
 # ==== Config ====
 # ================
 
-option(NEKO_NET_AUTO_FETCH_DEPS "Neko Net Automatically fetch dependencies" ON)
-option(NEKO_NET_BUILD_TESTS "Neko Net Build tests" ON)
-option(NEKO_NET_STATIC_LINK "Neko Net Static Link library" OFF)
+option(NEKO_NETWORK_AUTO_FETCH_DEPS "Neko Network Automatically fetch dependencies" ON)
+option(NEKO_NETWORK_BUILD_TESTS "Neko Network Build tests" ON)
+option(NEKO_NETWORK_STATIC_LINK "Neko Network Static Link library" OFF)
 
-set(NEKO_NET_LIBRARY_PATH "" CACHE PATH "Path to look for dependencies (OpenSSL, libcurl, GTest)")
+set(NEKO_NETWORK_LIBRARY_PATH "" CACHE PATH "Path to look for dependencies (OpenSSL, libcurl, GTest)")
 
-if(NEKO_NET_LIBRARY_PATH)
-    list(APPEND CMAKE_PREFIX_PATH ${NEKO_NET_LIBRARY_PATH})
-endif(NEKO_NET_LIBRARY_PATH)
+if(NEKO_NETWORK_LIBRARY_PATH)
+    list(APPEND CMAKE_PREFIX_PATH ${NEKO_NETWORK_LIBRARY_PATH})
+endif(NEKO_NETWORK_LIBRARY_PATH)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+find_package(NekoSchema QUIET)
+find_package(NekoFunction QUIET)
+find_package(NekoSystem QUIET)
+find_package(NekoLog QUIET)
+
 find_package(OpenSSL QUIET)
-find_package(CURL REQUIRED)
+find_package(CURL QUIET)
 find_package(GTest QUIET)
 
-
 # Print configuration summary
-message(STATUS "Start configuration Neko Net...")
+message(STATUS "Start configuration Neko Network...")
 message(STATUS "")
-message(STATUS "NekoNet configuration summary:")
+message(STATUS "NekoNetwork configuration summary:")
 message(STATUS "")
 message(STATUS "  - CMake version: ${CMAKE_VERSION}")
-message(STATUS "  - Neko Net Library Path: ${NEKO_NET_LIBRARY_PATH}")
+message(STATUS "  - Neko Network Library Path: ${NEKO_NETWORK_LIBRARY_PATH}")
 message(STATUS "  - CMake Prefix Path: ${CMAKE_PREFIX_PATH}")
 message(STATUS "")
-message(STATUS "  - Neko Net Auto fetch deps: ${NEKO_NET_AUTO_FETCH_DEPS}")
-message(STATUS "  - Neko Net Build tests: ${NEKO_NET_BUILD_TESTS}")
-message(STATUS "  - Neko Net Static Link library: ${NEKO_NET_STATIC_LINK}")
+message(STATUS "  - Neko Network Auto fetch deps: ${NEKO_NETWORK_AUTO_FETCH_DEPS}")
+message(STATUS "  - Neko Network Build tests: ${NEKO_NETWORK_BUILD_TESTS}")
+message(STATUS "  - Neko Network Static Link library: ${NEKO_NETWORK_STATIC_LINK}")
 message(STATUS "")
 message(STATUS "Dependency summary:")
+message(STATUS "  - NekoSchema : ${NekoSchema_FOUND} version : ${NekoSchema_VERSION}")
+message(STATUS "  - NekoFunction : ${NekoFunction_FOUND} version : ${NekoFunction_VERSION}")
+message(STATUS "  - NekoSystem : ${NekoSystem_FOUND} version : ${NekoSystem_VERSION}")
+message(STATUS "  - NekoLog : ${NekoLog_FOUND} version : ${NekoLog_VERSION}")
 message(STATUS "  - OpenSSL support: ${OPENSSL_FOUND} version: ${OPENSSL_VERSION}")
 message(STATUS "  - libcurl support: ${CURL_FOUND} version: ${CURL_VERSION_STRING}")
 message(STATUS "  - GTest : ${GTest_FOUND} version : ${GTest_VERSION}")
 message(STATUS "")
 
 if (NOT CURL_FOUND)
-    message(FATAL_ERROR "Neko Net not found libcurl ; if you installed it, you may need to set -DNEKO_NET_LIBRARY_PATH=<path> or -DCMAKE_PREFIX_PATH=<path>")
+    message(FATAL_ERROR "Neko Network not found libcurl ; if you installed it, you may need to set -DNEKO_NETWORK_LIBRARY_PATH=<path>")
 endif()
 
 # On Windows, OpenSSL is optional if using Schannel (native SSL)
 # On other platforms, OpenSSL is required
 if (NOT WIN32 AND NOT OPENSSL_FOUND)
-    message(FATAL_ERROR "Neko Net not found OpenSSL ; if you installed it, you may need to set -DNEKO_NET_LIBRARY_PATH=<path> or -DCMAKE_PREFIX_PATH=<path>")
+    message(FATAL_ERROR "Neko Network not found OpenSSL ; if you installed it, you may need to set -DNEKO_NETWORK_LIBRARY_PATH=<path>")
 endif()
 
 # Create CURL::libcurl target if it doesn't exist (for older FindCURL.cmake)
@@ -65,49 +73,62 @@ if(CURL_FOUND AND NOT TARGET CURL::libcurl)
     endif()
 endif()
 
-if(NEKO_NET_AUTO_FETCH_DEPS)
-
+if(NEKO_NETWORK_AUTO_FETCH_DEPS)
     include(FetchContent)
 
-    FetchContent_Declare(
-        NekoSchema
-        GIT_REPOSITORY https://github.com/moehoshio/NekoSchema.git
-        GIT_TAG        main
-    )
-    FetchContent_MakeAvailable(NekoSchema)
+    if(NOT NekoSchema_FOUND)
+        message(STATUS "NekoSchema not found; Neko Network is Fetching NekoSchema...")
+        FetchContent_Declare(
+            NekoSchema
+            GIT_REPOSITORY https://github.com/moehoshio/NekoSchema.git
+            GIT_TAG        main
+        )
+        set(NEKO_SCHEMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(NekoSchema)
+    endif()
 
-    FetchContent_Declare(
-        NekoFunction
-        GIT_REPOSITORY https://github.com/moehoshio/NekoFunction.git
-        GIT_TAG        main
-    )
-    set(NEKO_FUNCTION_LIBRARY_PATH ${CMAKE_PREFIX_PATH})
-    FetchContent_MakeAvailable(NekoFunction)
+    if(NOT NekoFunction_FOUND)
+        message(STATUS "NekoFunction not found; Neko Network is Fetching NekoFunction...")
+        FetchContent_Declare(
+            NekoFunction
+            GIT_REPOSITORY https://github.com/moehoshio/NekoFunction.git
+            GIT_TAG        main
+        )
+        set(NEKO_FUNCTION_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+        set(NEKO_FUNCTION_STATIC_LINK ${NEKO_NETWORK_STATIC_LINK} CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(NekoFunction)
+    endif()
 
-    FetchContent_Declare(
-        NekoSystem
-        GIT_REPOSITORY https://github.com/moehoshio/NekoSystem
-        GIT_TAG        main
-    )
-    FetchContent_MakeAvailable(NekoSystem)
+    if(NOT NekoSystem_FOUND)
+        message(STATUS "NekoSystem not found; Neko Network is Fetching NekoSystem...")
+        FetchContent_Declare(
+            NekoSystem
+            GIT_REPOSITORY https://github.com/moehoshio/NekoSystem
+            GIT_TAG        main
+        )
+        set(NEKO_SYSTEM_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(NekoSystem)
+    endif()
 
     # Optionally
-    FetchContent_Declare(
-        NekoLog
-        GIT_REPOSITORY https://github.com/moehoshio/NekoLog.git
-        GIT_TAG        main
-    )
-    FetchContent_MakeAvailable(NekoLog)
+    if(NOT NekoLog_FOUND)
+        message(STATUS "NekoLog not found; Neko Network is Fetching NekoLog...")
+        FetchContent_Declare(
+            NekoLog
+            GIT_REPOSITORY https://github.com/moehoshio/NekoLog.git
+            GIT_TAG        main
+        )
+        set(NEKO_LOG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(NekoLog)
+    endif()
 
-    if(NOT GTEST_FOUND AND NEKO_NET_BUILD_TESTS)
-        message(STATUS "GTest not found; Neko Net is Fetching GoogleTest...")
-
+    if(NOT GTest_FOUND AND NEKO_NETWORK_BUILD_TESTS)
+        message(STATUS "GTest not found; Neko Network is Fetching GoogleTest...")
         FetchContent_Declare(
             googletest
             GIT_REPOSITORY https://github.com/google/googletest.git
             GIT_TAG        v1.17.0
         )
-        # For Windows: Prevent overriding the parent project's compiler/linker settings
         set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
         FetchContent_MakeAvailable(googletest)
     endif()
@@ -118,38 +139,34 @@ endif()
 # = Main Target =
 # ================
 
-add_library(NekoNet STATIC src/neko/network/network.cpp)
-add_library(Neko::Net ALIAS NekoNet)
+add_library(NekoNetwork STATIC src/neko/network/network.cpp)
+add_library(Neko::Network ALIAS NekoNetwork)
 
-target_include_directories(NekoNet PUBLIC
+target_include_directories(NekoNetwork PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 
 # Dependencies
-target_link_libraries(NekoNet PUBLIC
+target_link_libraries(NekoNetwork PUBLIC
     # Neko
     NekoSchema NekoLog NekoFunction NekoSystem
     # libcurl
     CURL::libcurl
 )
-target_compile_features(NekoNet PUBLIC cxx_std_20)
+target_compile_features(NekoNetwork PUBLIC cxx_std_20)
 
 if(WIN32)
-    target_link_libraries(NekoNet PUBLIC ws2_32) # Windows Sockets
-endif()
-
-if(MSVC)
-    target_compile_options(NekoNet PUBLIC /Zc:__cplusplus)
+    target_link_libraries(NekoNetwork PUBLIC ws2_32) # Windows Sockets
 endif()
 
 # Link OpenSSL if found (optional on Windows when using Schannel)
 if(OPENSSL_FOUND)
-    target_link_libraries(NekoNet PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+    target_link_libraries(NekoNetwork PUBLIC OpenSSL::SSL OpenSSL::Crypto)
 
     # On Windows with OpenSSL static linking, additional system libraries are required
-    if(WIN32 AND NEKO_NET_STATIC_LINK)
-        target_link_libraries(NekoNet PUBLIC
+    if(WIN32 AND NEKO_NETWORK_STATIC_LINK)
+        target_link_libraries(NekoNetwork PUBLIC
             Crypt32
             advapi32
             user32
@@ -163,33 +180,83 @@ endif()
 # ===== Test =====
 # ================
 
-if(NEKO_NET_BUILD_TESTS)
+if(NEKO_NETWORK_BUILD_TESTS)
     enable_testing()
-    message(STATUS "NekoNet tests enabled (NEKO_NET_BUILD_TESTS=ON)")
+    message(STATUS "NekoNetwork tests enabled (NEKO_NETWORK_BUILD_TESTS=ON)")
 
-    if (NOT GTEST_FOUND AND NOT NEKO_NET_AUTO_FETCH_DEPS)
+    if (NOT GTEST_FOUND AND NOT NEKO_NETWORK_AUTO_FETCH_DEPS)
         message(WARNING "GTest is required for building tests but was not found.")
-        message(FATAL_ERROR "Please enable -DNEKO_NET_AUTO_FETCH_DEPS=ON or install GTest and make it discoverable by CMake. use -DNEKO_NET_LIBRARY_PATH=</path/to/gtest>")
+        message(FATAL_ERROR "Please enable -DNEKO_NETWORK_AUTO_FETCH_DEPS=ON or install GTest and make it discoverable by CMake. use -DNEKO_NETWORK_LIBRARY_PATH=</path/to/gtest>")
     endif()
 
-    add_executable(NekoNet_tests tests/network_test.cpp)
-    target_include_directories(NekoNet_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-    target_link_libraries(NekoNet_tests PRIVATE NekoNet GTest::gtest GTest::gtest_main)
-    target_compile_features(NekoNet_tests PRIVATE cxx_std_20)
+    add_executable(NekoNetwork_test tests/network_test.cpp)
+    target_include_directories(NekoNetwork_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_link_libraries(NekoNetwork_test PRIVATE NekoNetwork GTest::gtest GTest::gtest_main)
+    target_compile_features(NekoNetwork_test PRIVATE cxx_std_20)
 
-    # Automatically copy runtime libraries (DLLs on Windows, .so on Linux, .dylib on macOS)
     include(NekoRunTimeCopy)
-    NekoRunTimeCopy(NekoNet_tests)
+    NekoRunTimeCopy(NekoNetwork_test)
 
     include(GoogleTest)
-    # Use DISCOVERY_MODE PRE_TEST to avoid running tests at build time
-    # This prevents DLL loading issues during the build process
-    gtest_discover_tests(NekoNet_tests 
+    gtest_discover_tests(NekoNetwork_test 
         DISCOVERY_MODE PRE_TEST
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
+    
 else()
-    message(STATUS "NekoNet tests disabled (NEKO_NET_BUILD_TESTS=OFF)")
+    message(STATUS "NekoNetwork tests disabled (NEKO_NETWORK_BUILD_TESTS=OFF)")
 endif()
 
-message(STATUS "Neko Net End of configuration")
+# ================
+# == Install =====
+# ================
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+# Install headers
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING 
+    PATTERN "*.hpp"
+    PATTERN "*.cppm"
+)
+
+# Install targets
+install(TARGETS NekoNetwork
+    EXPORT NekoNetworkTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILE_SET CXX_MODULES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+# Install export targets
+install(EXPORT NekoNetworkTargets
+    FILE NekoNetworkTargets.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/NekoNetwork
+)
+
+# Create and install Config file
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NekoNetworkConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/NekoNetworkConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/NekoNetwork
+)
+
+# Create and install Version file
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/NekoNetworkConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+    ARCH_INDEPENDENT
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/NekoNetworkConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/NekoNetworkConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/NekoNetwork
+)
+
+message(STATUS "Neko Network End of configuration")

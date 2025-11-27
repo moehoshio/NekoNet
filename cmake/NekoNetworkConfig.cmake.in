@@ -1,0 +1,18 @@
+@PACKAGE_INIT@
+
+# Find required dependencies
+include(CMakeFindDependencyMacro)
+find_dependency(NekoSchema REQUIRED)
+find_dependency(NekoFunction REQUIRED)
+find_dependency(NekoSystem REQUIRED)
+find_dependency(NekoLog QUIET)
+
+# Include the targets file
+include("${CMAKE_CURRENT_LIST_DIR}/NekoNetworkTargets.cmake")
+
+# Recreate alias for consumers
+if(TARGET NekoNetwork AND NOT TARGET Neko::Network)
+	add_library(Neko::Network ALIAS NekoNetwork)
+endif()
+
+check_required_components(NekoNetwork)
