@@ -1,10 +1,11 @@
 # Neko Network
 
-Neko Network (NekoNet) is a modern, easy-to-use, and efficient C++20 network library built on top of libcurl.
+Neko Network is a modern, easy-to-use, and efficient C++20 network library built on top of libcurl.
 
 [![License](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 ![Require](https://img.shields.io/badge/%20Require%20-%3E=%20C++%2020-orange.svg)
 [![CMake](https://img.shields.io/badge/CMake-3.16+-green.svg)](https://cmake.org/)
+[![CI Status](https://github.com/moehoshio/NekoNetwork/actions/workflows/ci.yml/badge.svg)](https://github.com/moehoshio/NekoNetwork/actions/workflows/ci.yml)
 
 ## Features
 
@@ -26,7 +27,6 @@ Neko Network (NekoNet) is a modern, easy-to-use, and efficient C++20 network lib
 
 ## Requirements
 
-
 - C++20 or higher compatible compiler
 - CMake 3.16 or higher
 - Git
@@ -35,13 +35,14 @@ Neko Network (NekoNet) is a modern, easy-to-use, and efficient C++20 network lib
 
 ## Platform Support
 
-NekoNet is tested on the following platforms:
+Neko Network is tested on the following platforms:
 
 - **Windows** - MSVC 2022+ (Debug/Release)
 - **Linux** - GCC 10+, Clang 12+ (Debug/Release)
 - **macOS** - Apple Clang 13+ (Debug/Release)
 
 All platforms support:
+
 - Multi-threaded operations
 - Asynchronous execution
 - Resumable downloads
@@ -49,7 +50,7 @@ All platforms support:
 
 ## Dependencies
 
-NekoNet depends on the following libraries:
+Neko Network depends on the following libraries:
 
 ### Required
 
@@ -77,23 +78,23 @@ Advanced:
 
 ### CMake
 
-1. Using CMake's `FetchContent` to include NekoNet in your project:
+1. Using CMake's `FetchContent` to include Neko Network in your project:
 
 ```cmake
 include(FetchContent)
 
-# Add NekoNet to your CMake project
+# Add Neko Network to your CMake project
 FetchContent_Declare(
-    NekoNet
-    GIT_REPOSITORY https://github.com/moehoshio/NekoNet.git
+    NekoNetwork
+    GIT_REPOSITORY https://github.com/moehoshio/NekoNetwork.git
     GIT_TAG        main
 )
-FetchContent_MakeAvailable(NekoNet)
+FetchContent_MakeAvailable(NekoNetwork)
 
-# Add your target and link NekoNet
+# Add your target and link NekoNetwork
 add_executable(your_target main.cpp)
 
-target_link_libraries(your_target PRIVATE Neko::Net)
+target_link_libraries(your_target PRIVATE Neko::Network)
 ```
 
 2. Include the header in your source code
@@ -105,22 +106,16 @@ target_link_libraries(your_target PRIVATE Neko::Net)
 3. Let CMake find libcurl and OpenSSL (if you have already installed the dependencies)
 
 ```bash
-cmake -B ./build . -DNEKO_NET_LIBRARY_PATH="/path/to/" -S .
-```
-
-or
-
-```bash
-cmake -B ./build . -DCMAKE_PREFIX_PATH="/path/to/" -S .
+cmake -B ./build . -DNEKO_NETWORK_LIBRARY_PATH="/path/to/" -S .
 ```
 
 ### Static Linking
 
-If you want to use static linking, make sure all libraries (OpenSSL, libcurl..) are built as static libraries. (NekoNet itself is always a static library)
+If you want to use static linking, make sure all libraries (OpenSSL, libcurl..) are built as static libraries. (Neko Network itself is always a static library)
 Enable the static linking option in your CMake configuration:
 
 ```bash
-cmake -B ./build . -DNEKO_NET_STATIC_LINK=ON -DNEKO_NET_LIBRARY_PATH="/path/to/x64-windows-static" -S .
+cmake -B ./build . -DNEKO_NETWORK_STATIC_LINK=ON -DNEKO_NETWORK_LIBRARY_PATH="/path/to/x64-windows-static" -S .
 ```
 
 ### Basic Example
@@ -453,7 +448,7 @@ if (lastModified) {
 
 #### Supported Types
 
-By default, NekoNet provides explicit template instantiations for:
+By default, NekoNetwork provides explicit template instantiations for:
 
 - `std::string` - Text responses (default)
 - `std::vector<char>` - Binary data
@@ -688,9 +683,9 @@ if (!result.isSuccess()) {
 
 ### Custom Logger
 
-NekoNet uses an internal logging system that can be customized to integrate with your application's logging infrastructure.
+NekoNetwork uses an internal logging system that can be customized to integrate with your application's logging infrastructure.
 
-By default, NekoNet automatically uses:
+By default, NekoNetwork automatically uses:
 - **NLogLogger** if NekoLog is available
 - **DefaultLogger** (stdout/stderr) as fallback
 
@@ -706,22 +701,22 @@ class MyCustomLogger : public log::ILogger {
 public:
     void error(const std::string &msg) override {
         // Your custom error logging
-        myLogSystem->logError("NekoNet", msg);
+        myLogSystem->logError("NekoNetwork", msg);
     }
     
     void info(const std::string &msg) override {
         // Your custom info logging
-        myLogSystem->logInfo("NekoNet", msg);
+        myLogSystem->logInfo("NekoNetwork", msg);
     }
     
     void warn(const std::string &msg) override {
         // Your custom warning logging
-        myLogSystem->logWarning("NekoNet", msg);
+        myLogSystem->logWarning("NekoNetwork", msg);
     }
     
     void debug(const std::string &msg) override {
         // Your custom debug logging
-        myLogSystem->logDebug("NekoNet", msg);
+        myLogSystem->logDebug("NekoNetwork", msg);
     }
 
 private:
@@ -760,9 +755,9 @@ Network network(
 
 ### Custom Async Executor
 
-NekoNet uses an executor system for asynchronous operations. You can replace the default `std::async` executor with your own implementation (e.g., thread pool).
+NekoNetwork uses an executor system for asynchronous operations. You can replace the default `std::async` executor with your own implementation (e.g., thread pool).
 
-By default, NekoNet uses `StdAsyncExecutor` which wraps `std::async`.
+By default, NekoNetwork uses `StdAsyncExecutor` which wraps `std::async`.
 
 #### Using Custom Executor
 
@@ -875,7 +870,7 @@ int main() {
 
 ### Global Configuration
 
-NekoNet provides a global configuration system for setting default values:
+NekoNetwork provides a global configuration system for setting default values:
 
 ```cpp
 using namespace neko::network;
@@ -952,7 +947,7 @@ You can run the tests to verify that everything is working correctly.
 If you haven't configured the build yet, please run:
 
 ```shell
-cmake -B ./build . -DNEKO_NET_BUILD_TESTS=ON -DNEKO_NET_AUTO_FETCH_DEPS=ON -S .
+cmake -B ./build . -DNEKO_NETWORK_BUILD_TESTS=ON -DNEKO_NETWORK_AUTO_FETCH_DEPS=ON -S .
 ```
 
 Now, you can build the test files (you must build them manually at least once before running the tests!).
@@ -970,7 +965,7 @@ cd ./build && ctest --output-on-failure
 If everything is set up correctly, you should see output similar to the following:
 
 ```shell
-Test project /path/to/NekoNet/build
+Test project /path/to/NekoNetwork/build
     Start  1: NetworkResultTest.IsSuccessReturnsTrueFor200StatusCode
 1/27 Test  #1: NetworkResultTest.IsSuccessReturnsTrueFor200StatusCode ...   Passed    0.00 sec
 
@@ -989,7 +984,7 @@ Total Test time (real) =   0.15 sec
 If you want to disable building and running tests, you can set the following CMake option when configuring your project:
 
 ```shell
-cmake -B ./build . -DNEKO_NET_BUILD_TESTS=OFF -S .
+cmake -B ./build . -DNEKO_NETWORK_BUILD_TESTS=OFF -S .
 ```
 
 This will skip test targets during the build process.
@@ -1008,11 +1003,11 @@ For more detailed information, please refer to:
 
 ## See More
 
-- [NekoNet](https://github.com/moehoshio/NekoNet): A modern , easy-to-use C++20 networking library via libcurl.
 - [NekoLog](https://github.com/moehoshio/NekoLog): An easy-to-use, modern, lightweight, and efficient C++20 logging library.
 - [NekoEvent](https://github.com/moehoshio/NekoEvent): A modern easy to use type-safe and high-performance event handling system for C++.
 - [NekoSchema](https://github.com/moehoshio/NekoSchema): A lightweight, header-only C++20 schema library.
 - [NekoSystem](https://github.com/moehoshio/NekoSystem): A modern C++20 cross-platform system utility library.
+- [NekoNetwork](https://github.com/moehoshio/NekoNetwork): A modern , easy-to-use C++20 networking library via libcurl.
 - [NekoFunction](https://github.com/moehoshio/NekoFunction): A comprehensive modern C++ utility library that provides practical functions for common programming tasks.
 - [NekoThreadPool](https://github.com/moehoshio/NekoThreadPool): An easy to use and efficient C++ 20 thread pool that supports priorities and submission to specific threads.
 
@@ -1022,4 +1017,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Support
 
-If you encounter any issues or have questions, please file an issue on the [GitHub issue tracker](https://github.com/moehoshio/NekoNet/issues).
+If you encounter any issues or have questions, please file an issue on the [GitHub issue tracker](https://github.com/moehoshio/NekoNetwork/issues).
