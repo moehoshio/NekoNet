@@ -179,6 +179,17 @@ namespace neko::network {
             return written;
         }
 
+        /**
+         * @brief Header callback function for capturing HTTP headers
+         * This is used specifically for HEAD requests to capture response headers
+         */
+        inline neko::uint64 headerCallback(char *ptr, neko::uint64 size, neko::uint64 nmemb, void *userdata) {
+            auto *headers = static_cast<std::string *>(userdata);
+            neko::uint64 dataSize = size * nmemb;
+            headers->append(ptr, dataSize);
+            return dataSize;
+        }
+
     } // namespace helper
 
     namespace log {

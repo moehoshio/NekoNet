@@ -248,7 +248,7 @@ TEST_F(NetworkTest, ExecuteWithEmptyUrlReturnsError) {
 // Network request tests (require actual network connection)
 // ============================================================================
 
-TEST_F(NetworkTest, DISABLED_GetRequestToPublicApiReturnsSuccess) {
+TEST_F(NetworkTest, GetRequestToPublicApiReturnsSuccess) {
     // This test is disabled by default because it requires an actual network connection
     // You can run it using --gtest_also_run_disabled_tests
     RequestConfig config;
@@ -262,7 +262,7 @@ TEST_F(NetworkTest, DISABLED_GetRequestToPublicApiReturnsSuccess) {
     EXPECT_EQ(result.statusCode, 200);
 }
 
-TEST_F(NetworkTest, DISABLED_PostRequestWithJsonDataReturnsSuccess) {
+TEST_F(NetworkTest, PostRequestWithJsonDataReturnsSuccess) {
     RequestConfig config;
     config.url = "https://httpbin.org/post";
     config.method = RequestType::Post;
@@ -276,7 +276,7 @@ TEST_F(NetworkTest, DISABLED_PostRequestWithJsonDataReturnsSuccess) {
     EXPECT_EQ(result.statusCode, 200);
 }
 
-TEST_F(NetworkTest, DISABLED_HeadRequestReturnsSuccessWithoutContent) {
+TEST_F(NetworkTest, HeadRequestReturnsSuccessWithoutContent) {
     RequestConfig config;
     config.url = "https://httpbin.org/get";
     config.method = RequestType::Head;
@@ -287,17 +287,20 @@ TEST_F(NetworkTest, DISABLED_HeadRequestReturnsSuccessWithoutContent) {
     EXPECT_EQ(result.statusCode, 200);
 }
 
-TEST_F(NetworkTest, DISABLED_GetContentTypeReturnsCorrectType) {
-    auto contentType = network->getContentType("https://httpbin.org/json");
+TEST_F(NetworkTest, GetContentTypeReturnsCorrectType) {
+    // Test that getContentType() correctly retrieves Content-Type header via HEAD request
+    auto contentType = network->getContentType("https://httpbin.org/get");
 
     EXPECT_TRUE(contentType.has_value());
     if (contentType.has_value()) {
+        // httpbin.org/get returns application/json
         EXPECT_TRUE(contentType->find("application/json") != std::string::npos);
     }
 }
 
-TEST_F(NetworkTest, DISABLED_GetContentSizeReturnsPositiveValue) {
-    auto contentSize = network->getContentSize("https://httpbin.org/json");
+TEST_F(NetworkTest, GetContentSizeReturnsPositiveValue) {
+    // Test that getContentSize() correctly retrieves Content-Length header via HEAD request
+    auto contentSize = network->getContentSize("https://httpbin.org/get");
 
     EXPECT_TRUE(contentSize.has_value());
     if (contentSize.has_value()) {
@@ -305,8 +308,9 @@ TEST_F(NetworkTest, DISABLED_GetContentSizeReturnsPositiveValue) {
     }
 }
 
-TEST_F(NetworkTest, DISABLED_FindUrlHeaderReturnsCorrectHeader) {
-    auto header = network->findUrlHeader("https://httpbin.org/json", "Content-Type");
+TEST_F(NetworkTest, FindUrlHeaderReturnsCorrectHeader) {
+    // Test that findUrlHeader() correctly retrieves headers via HEAD request
+    auto header = network->findUrlHeader("https://httpbin.org/get", "Content-Type");
 
     EXPECT_TRUE(header.has_value());
     if (header.has_value()) {
@@ -318,7 +322,7 @@ TEST_F(NetworkTest, DISABLED_FindUrlHeaderReturnsCorrectHeader) {
 // Asynchronous request tests
 // ============================================================================
 
-TEST_F(NetworkTest, DISABLED_ExecuteAsyncReturnsValidFuture) {
+TEST_F(NetworkTest, ExecuteAsyncReturnsValidFuture) {
     RequestConfig config;
     config.url = "https://httpbin.org/get";
     config.method = RequestType::Get;
@@ -337,7 +341,7 @@ TEST_F(NetworkTest, DISABLED_ExecuteAsyncReturnsValidFuture) {
 // Retry logic tests
 // ============================================================================
 
-TEST_F(NetworkTest, DISABLED_ExecuteWithRetrySucceedsAfterRetries) {
+TEST_F(NetworkTest, ExecuteWithRetrySucceedsAfterRetries) {
     RetryConfig config;
     config.config.url = "https://httpbin.org/status/500";
     config.config.method = RequestType::Get;

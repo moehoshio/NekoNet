@@ -334,19 +334,24 @@ namespace neko::network {
 
     template <typename T>
     NetworkResult<T> Network::handleHeadRequest(CURL *curl, const RequestConfig &config) {
-        T headerContent{};
-        helper::WriteCallbackContext<T> writeContext;
-        writeContext.buffer = &headerContent;
-        writeContext.progressCallback = const_cast<std::function<void(neko::uint64)>*>(&config.progressCallback);
+        std::string headerContent;
 
+        // HEAD requests don't have a response body, only headers
+        // Use CURLOPT_HEADERFUNCTION to capture the response headers
         curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &helper::writeToCallback<T>);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &writeContext);
+        curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, &helper::headerCallback);
+        curl_easy_setopt(curl, CURLOPT_HEADERDATA, &headerContent);
 
         NetworkResult<T> result = performRequest<T>(curl, config);
 
         if (!result.hasError) {
-            result.content = std::move(headerContent);
+            // Convert headerContent to the appropriate type T
+            if constexpr (std::is_same_v<T, std::string>) {
+                result.content = std::move(headerContent);
+            } else if constexpr (std::is_same_v<T, std::vector<char>>) {
+                result.content = std::vector<char>(headerContent.begin(), headerContent.end());
+            }
+            // For other types like std::fstream, headers are not typically stored
         }
 
         return result;
@@ -522,15 +527,19 @@ namespace neko::network {
             return std::nullopt;
         }
 
-        // Find the specified header in the response
+        // Find the specified header in the response (case-insensitive)
         std::string headers = result.content;
-        std::transform(headers.begin(), headers.end(), headers.begin(), ::tolower);
+        std::string lowerHeaders = headers;
+        std::string lowerHeaderName = headerName;
+        std::transform(lowerHeaders.begin(), lowerHeaders.end(), lowerHeaders.begin(), ::tolower);
+        std::transform(lowerHeaderName.begin(), lowerHeaderName.end(), lowerHeaderName.begin(), ::tolower);
 
-        std::size_t pos = headers.find(headerName + ":");
+        std::size_t pos = lowerHeaders.find(lowerHeaderName + ":");
         if (pos == std::string::npos) {
             return std::nullopt;
         }
 
+        // Extract the header value from the original headers (preserving case)
         std::size_t start = pos + headerName.length() + 1; // Skip "headerName: "
         std::size_t end = headers.find_first_of("\r\n", start);
         std::string headerValue = headers.substr(start, end - start);

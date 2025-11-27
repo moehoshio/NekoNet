@@ -1,4 +1,4 @@
-name: Neko Function CI
+name: Neko Network CI
 
 on:
   push:
@@ -156,7 +156,7 @@ jobs:
       if: "!startsWith(matrix.config.os, 'windows')"
       run: |
         echo "=== Installing dependencies via vcpkg ==="
-        ~/vcpkg/vcpkg install zlib openssl minizip-ng curl
+        ~/vcpkg/vcpkg install zlib openssl curl
 
     # ============================================================================
     # Windows: Use default vcpkg
@@ -168,7 +168,7 @@ jobs:
         $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
         Write-Host "Using vcpkg at: $vcpkgRoot"
 
-        vcpkg install openssl:x64-windows minizip-ng:x64-windows curl:x64-windows --recurse
+        vcpkg install openssl:x64-windows curl:x64-windows --recurse
         Write-Host ""
         Write-Host "=== Installed packages ==="
         vcpkg list
@@ -176,11 +176,6 @@ jobs:
         Write-Host "=== Verifying installation ==="
         $installedPath = "$vcpkgRoot\installed\x64-windows"
         Write-Host "Installed path: $installedPath"
-        if (Test-Path "$installedPath\share\minizip-ng") {
-          Write-Host "minizip-ng CMake files: OK"
-        } else {
-          Write-Host "minizip-ng CMake files: NOT FOUND"
-        }
         if (Test-Path "$installedPath\share\openssl") {
           Write-Host "OpenSSL CMake files: OK"
         } else {
@@ -198,7 +193,7 @@ jobs:
     - name: Configure CMake (Windows)
       if: startsWith(matrix.config.os, 'windows')
       run: |
-        Write-Host "=== Configuring NekoFunction (Windows) ==="
+        Write-Host "=== Configuring NekoNetwork (Windows) ==="
         $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
         $toolchainFile = "$vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
         $installedPath = "$vcpkgRoot\installed\x64-windows"
@@ -208,7 +203,7 @@ jobs:
         Write-Host "CMAKE_PREFIX_PATH: $installedPath"
         
         cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} -G "${{ matrix.config.generators }}" `
-          -DNEKO_FUNCTION_BUILD_TESTS=ON -DNEKO_FUNCTION_AUTO_FETCH_DEPS=ON `
+          -DNEKO_NETWORK_BUILD_TESTS=ON -DNEKO_NETWORK_AUTO_FETCH_DEPS=ON `
           -DCMAKE_TOOLCHAIN_FILE="$toolchainFile" `
           -DVCPKG_TARGET_TRIPLET=x64-windows `
           -DCMAKE_PREFIX_PATH="$installedPath"
@@ -217,28 +212,13 @@ jobs:
     - name: Configure CMake (Ubuntu)
       if: "startsWith(matrix.config.os, 'ubuntu')"
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} -DCMAKE_C_COMPILER=${{ matrix.config.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }} -G "${{ matrix.config.generators }}" -DNEKO_FUNCTION_BUILD_TESTS=ON -DNEKO_FUNCTION_AUTO_FETCH_DEPS=ON -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DCMAKE_PREFIX_PATH=$VCPKG_ROOT/installed/x64-linux
+        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} -DCMAKE_C_COMPILER=${{ matrix.config.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }} -G "${{ matrix.config.generators }}" -DNEKO_NETWORK_BUILD_TESTS=ON -DNEKO_NETWORK_AUTO_FETCH_DEPS=ON -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DCMAKE_PREFIX_PATH=$VCPKG_ROOT/installed/x64-linux
       shell: bash
 
     - name: Configure CMake (macOS)
       if: "startsWith(matrix.config.os, 'macos')"
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} -DCMAKE_C_COMPILER=${{ matrix.config.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }} -G "${{ matrix.config.generators }}" -DNEKO_FUNCTION_BUILD_TESTS=ON -DNEKO_FUNCTION_AUTO_FETCH_DEPS=ON -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DCMAKE_PREFIX_PATH=$VCPKG_ROOT/installed/x64-macos
-      shell: bash
-
-    - name: Verify Hash and Archive Support
-      run: |
-        echo "=== NekoFunction Configuration Check ==="
-        if grep -q "Hash support enabled: ON" build/CMakeCache.txt 2>/dev/null || grep -rq "Hash support enabled: ON" build/ 2>/dev/null; then
-          echo "✓ Hash support is ENABLED"
-        else
-          echo "✗ Hash support is DISABLED or not found"
-        fi
-        if grep -q "Archiver support enabled: ON" build/CMakeCache.txt 2>/dev/null || grep -rq "Archiver support enabled: ON" build/ 2>/dev/null; then
-          echo "✓ Archiver support is ENABLED"
-        else
-          echo "✗ Archiver support is DISABLED or not found"
-        fi
+        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} -DCMAKE_C_COMPILER=${{ matrix.config.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }} -G "${{ matrix.config.generators }}" -DNEKO_NETWORK_BUILD_TESTS=ON -DNEKO_NETWORK_AUTO_FETCH_DEPS=ON -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DCMAKE_PREFIX_PATH=$VCPKG_ROOT/installed/x64-macos
       shell: bash
 
     - name: Build
