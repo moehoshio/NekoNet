@@ -1,1 +1,5 @@
 ﻿sources:
+
+  "1.0.0":
+    url: "https://github.com/moehoshio/NekoNetwork/archive/refs/tags/v1.0.0.tar.gz"
+    sha256: "8e335e567e94b4f5d6bddf54f1969a2972c4ff11e37f8f37614c6687d8f679c3"
