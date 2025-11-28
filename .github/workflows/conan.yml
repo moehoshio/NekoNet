@@ -111,6 +111,14 @@ jobs:
       working-directory: tests/conan
       run: cmake --build ./build --config Release
 
+    - name: Download CA certificate bundle (Windows)
+      if: runner.os == 'Windows'
+      working-directory: tests/conan
+      run: |
+        # Download the latest CA bundle from curl.se
+        Invoke-WebRequest -Uri "https://curl.se/ca/cacert.pem" -OutFile "cacert.pem"
+        Write-Host "CA bundle downloaded to: $(Get-Location)\cacert.pem"
+
     - name: Run test executable (Unix)
       if: runner.os != 'Windows'
       working-directory: tests/conan

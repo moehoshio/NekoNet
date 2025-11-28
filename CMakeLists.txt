@@ -11,6 +11,21 @@ option(NEKO_NETWORK_STATIC_LINK "Neko Network Static Link library" OFF)
 
 set(NEKO_NETWORK_LIBRARY_PATH "" CACHE PATH "Path to look for dependencies (OpenSSL, libcurl, GTest)")
 
+# Set MSVC runtime library to match vcpkg triplet
+# vcpkg's x64-windows-static uses /MT (static runtime)
+# vcpkg's x64-windows uses /MD (dynamic runtime)
+if(MSVC)
+    if(VCPKG_TARGET_TRIPLET)
+        if(VCPKG_TARGET_TRIPLET MATCHES ".*-static$")
+            set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+            message(STATUS "Using static MSVC runtime (/MT) for triplet: ${VCPKG_TARGET_TRIPLET}")
+        else()
+            set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+            message(STATUS "Using dynamic MSVC runtime (/MD) for triplet: ${VCPKG_TARGET_TRIPLET}")
+        endif()
+    endif()
+endif()
+
 if(NEKO_NETWORK_LIBRARY_PATH)
     list(APPEND CMAKE_PREFIX_PATH ${NEKO_NETWORK_LIBRARY_PATH})
 endif(NEKO_NETWORK_LIBRARY_PATH)

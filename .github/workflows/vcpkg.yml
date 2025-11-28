@@ -269,6 +269,14 @@ jobs:
           exit 1
         }
 
+    - name: Download CA certificate bundle (Windows)
+      if: runner.os == 'Windows'
+      working-directory: tests/vcpkg
+      run: |
+        # Download the latest CA bundle from curl.se
+        Invoke-WebRequest -Uri "https://curl.se/ca/cacert.pem" -OutFile "cacert.pem"
+        Write-Host "CA bundle downloaded to: $(Get-Location)\cacert.pem"
+
     - name: Build and run integration test (Windows)
       if: runner.os == 'Windows'
       working-directory: tests/vcpkg
