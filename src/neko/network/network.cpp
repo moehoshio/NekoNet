@@ -156,14 +156,14 @@ namespace neko::network {
         }
 
         // Set CA certificate
+        // On Windows, if libcurl is built with Schannel, it will use the Windows certificate store automatically
+        // Only set CAINFO if we have a custom cacert.pem file
         std::string caPath = system::workPath() + "/cacert.pem";
         if (std::filesystem::exists(caPath)) {
             curl_easy_setopt(curl, CURLOPT_CAINFO, caPath.c_str());
-        } else {
-            errorMsg << "The cacert.pem file does not exist at: " << caPath << ", ID: " << config.requestId << ", Use the system default CA bundle.";
-            logWarn("Network::initCurl() : " + errorMsg.str());
-            errorMsg.str("");
+            logDebug("Network::initCurl() : Using custom CA bundle at: " + caPath);
         }
+        // If cacert.pem doesn't exist, libcurl will use system default (Windows cert store on Windows, system CA bundle on Unix)
 
         curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NO_REVOKE);
         auto systemProxy = helper::getSysProxy();

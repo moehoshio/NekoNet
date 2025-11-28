@@ -8,8 +8,24 @@ find_dependency(NekoSystem REQUIRED)
 find_dependency(NekoLog QUIET)
 find_dependency(CURL REQUIRED)
 
+# OpenSSL is optional on Windows (when using Schannel), required on other platforms
+if(NOT WIN32)
+    find_dependency(OpenSSL REQUIRED)
+endif()
+
 # Include the targets file
 include("${CMAKE_CURRENT_LIST_DIR}/NekoNetworkTargets.cmake")
+
+# On Windows, if targets reference OpenSSL, try to find it
+if(WIN32)
+    # Create dummy OpenSSL targets if they don't exist (for Schannel builds)
+    if(NOT TARGET OpenSSL::SSL)
+        add_library(OpenSSL::SSL INTERFACE IMPORTED)
+    endif()
+    if(NOT TARGET OpenSSL::Crypto)
+        add_library(OpenSSL::Crypto INTERFACE IMPORTED)
+    endif()
+endif()
 
 # Recreate alias for consumers
 if(TARGET NekoNetwork AND NOT TARGET Neko::Network)

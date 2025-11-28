@@ -26,6 +26,26 @@ find_package(OpenSSL QUIET)
 find_package(CURL QUIET)
 find_package(GTest QUIET)
 
+# Detect CURL SSL backend
+set(CURL_USES_SCHANNEL FALSE)
+set(CURL_SSL_BACKEND "Unknown")
+
+if(CURL_FOUND)
+    # Check if CURL is using Schannel (Windows native SSL)
+    if(WIN32)
+        # On Windows, vcpkg typically builds curl with Schannel
+        if(CURL_INCLUDE_DIRS MATCHES "vcpkg" OR NOT OPENSSL_FOUND)
+            set(CURL_USES_SCHANNEL TRUE)
+            set(CURL_SSL_BACKEND "Schannel (Windows native)")
+        elseif(OPENSSL_FOUND)
+            set(CURL_SSL_BACKEND "OpenSSL")
+        endif()
+    else()
+        # On Unix, typically OpenSSL
+        set(CURL_SSL_BACKEND "OpenSSL")
+    endif()
+endif()
+
 # Print configuration summary
 message(STATUS "Start configuration Neko Network...")
 message(STATUS "")
@@ -46,6 +66,7 @@ message(STATUS "  - NekoSystem : ${NekoSystem_FOUND} version : ${NekoSystem_VERS
 message(STATUS "  - NekoLog : ${NekoLog_FOUND} version : ${NekoLog_VERSION}")
 message(STATUS "  - OpenSSL support: ${OPENSSL_FOUND} version: ${OPENSSL_VERSION}")
 message(STATUS "  - libcurl support: ${CURL_FOUND} version: ${CURL_VERSION_STRING}")
+message(STATUS "  - CURL SSL backend: ${CURL_SSL_BACKEND}")
 message(STATUS "  - GTest : ${GTest_FOUND} version : ${GTest_VERSION}")
 message(STATUS "")
 
@@ -59,6 +80,14 @@ if (NOT WIN32 AND NOT OPENSSL_FOUND)
     message(FATAL_ERROR "Neko Network not found OpenSSL ; if you installed it, you may need to set -DNEKO_NETWORK_LIBRARY_PATH=<path>")
 endif()
 
+# On Windows, if CURL uses Schannel, we don't need OpenSSL
+if(WIN32 AND CURL_USES_SCHANNEL)
+    message(STATUS "CURL is using Schannel on Windows, OpenSSL is optional")
+    set(NEKO_NETWORK_USE_OPENSSL FALSE)
+else()
+    set(NEKO_NETWORK_USE_OPENSSL ${OPENSSL_FOUND})
+endif()
+
 # Create CURL::libcurl alias target if it doesn't exist
 if (NOT TARGET CURL::libcurl)
 
@@ -69,7 +98,7 @@ if (NOT TARGET CURL::libcurl)
     if (TARGET CURL::libcurl_shared)
         add_library(CURL::libcurl ALIAS CURL::libcurl_shared)
     endif()
-    
+
 endif()
 
 # Create CURL::libcurl target if it doesn't exist (for older FindCURL.cmake)
@@ -173,11 +202,18 @@ target_compile_features(NekoNetwork PUBLIC cxx_std_20)
 
 if(WIN32)
     target_link_libraries(NekoNetwork PUBLIC ws2_32) # Windows Sockets
+    
+    # If using Schannel, link Windows SSL libraries
+    if(CURL_USES_SCHANNEL)
+        target_link_libraries(NekoNetwork PUBLIC Crypt32)
+        message(STATUS "Linking Crypt32 for Schannel SSL support")
+    endif()
 endif()
 
-# Link OpenSSL if found (optional on Windows when using Schannel)
-if(OPENSSL_FOUND)
+# Link OpenSSL if needed (not on Windows with Schannel)
+if(NEKO_NETWORK_USE_OPENSSL)
     target_link_libraries(NekoNetwork PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+    message(STATUS "Linking OpenSSL libraries")
 
     # On Windows with OpenSSL static linking, additional system libraries are required
     if(WIN32 AND NEKO_NETWORK_STATIC_LINK)
