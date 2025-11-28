@@ -1,0 +1,6 @@
+[requires]
+neko-network/[*]
+
+[generators]
+CMakeDeps
+CMakeToolchain

@@ -33,21 +33,6 @@ Neko Network is a modern, easy-to-use, and efficient C++20 network library built
 - libcurl (with OpenSSL support)
 - OpenSSL
 
-## Platform Support
-
-Neko Network is tested on the following platforms:
-
-- **Windows** - MSVC 2022+ (Debug/Release)
-- **Linux** - GCC 10+, Clang 12+ (Debug/Release)
-- **macOS** - Apple Clang 13+ (Debug/Release)
-
-All platforms support:
-
-- Multi-threaded operations
-- Asynchronous execution
-- Resumable downloads
-- Proxy configuration
-
 ## Dependencies
 
 Neko Network depends on the following libraries:
@@ -68,7 +53,7 @@ Neko Network depends on the following libraries:
 ## Quick Start
 
 Configure:
-[CMake](#cmake) | [Static Linking](#static-linking) | [Tests](#testing)
+[CMake](#cmake) | [Vcpkg](#vcpkg) | [Conan](#conan) | [Tests](#testing)
 
 Example:
 [Basic](#basic-example) | [GET Request](#get-request) | [POST Request](#post-request) | [Download File](#download-file) | [Async Request](#asynchronous-requests)
@@ -89,6 +74,10 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/moehoshio/NekoNetwork.git
     GIT_TAG        main
 )
+# Set Variables Before Building
+set(NEKO_NETWORK_LIBRARY_PATH "/path/to/" CACHE PATH "" FORCE)  # Optional: specify custom library path
+set(NEKO_NETWORK_AUTO_FETCH_DEPS ON CACHE BOOL "" FORCE)        # Optional: auto-fetch dependencies
+set(NEKO_NETWORK_BUILD_TESTS ON CACHE BOOL "" FORCE)            # Optional: Enable building tests
 FetchContent_MakeAvailable(NekoNetwork)
 
 # Add your target and link NekoNetwork
@@ -103,19 +92,88 @@ target_link_libraries(your_target PRIVATE Neko::Network)
 #include <neko/network/network.hpp>
 ```
 
-3. Let CMake find libcurl and OpenSSL (if you have already installed the dependencies)
-
-```bash
-cmake -B ./build . -DNEKO_NETWORK_LIBRARY_PATH="/path/to/" -S .
-```
-
-### Static Linking
+#### Static Linking
 
 If you want to use static linking, make sure all libraries (OpenSSL, libcurl..) are built as static libraries. (Neko Network itself is always a static library)
 Enable the static linking option in your CMake configuration:
 
 ```bash
 cmake -B ./build . -DNEKO_NETWORK_STATIC_LINK=ON -DNEKO_NETWORK_LIBRARY_PATH="/path/to/x64-windows-static" -S .
+```
+
+or set it in your `CMakeLists.txt` before including Neko Network:
+
+```cmake
+set(NEKO_NETWORK_STATIC_LINK ON CACHE BOOL "" FORCE)
+set(NEKO_NETWORK_LIBRARY_PATH "/path/to/x64-windows-static" CACHE PATH "" FORCE)
+```
+
+### Vcpkg
+
+To install NekoNetwork using vcpkg, run the following command:
+
+```bash
+vcpkg install neko-network
+```
+
+Or add it to your `vcpkg.json`:
+
+```json
+{
+  "dependencies": ["neko-network"]
+}
+```
+
+Then in your CMakeLists.txt:
+
+```cmake
+find_package(NekoNetwork CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE Neko::Network)
+```
+
+When configuring your project, specify the vcpkg toolchain file:
+
+```shell
+cmake -B build -DCMAKE_PREFIX_PATH=/path/to/vcpkg/installed/x64-windows
+cmake --build build --config Debug
+```
+
+### Conan
+
+To install NekoNetwork using Conan, add the following to your `conanfile.txt`:
+
+```ini
+[requires]
+neko-network/[*]
+
+[generators]
+CMakeDeps
+CMakeToolchain
+```
+
+Or use it in your `conanfile.py`:
+
+```python
+from conan import ConanFile
+
+class YourProject(ConanFile):
+    requires = "neko-network/[*]"
+    generators = "CMakeDeps", "CMakeToolchain"
+```
+
+Then install and use:
+
+```shell
+conan install . --build=missing
+cmake -B build -DCMAKE_TOOLCHAIN_FILE=build/conan_toolchain.cmake
+cmake --build build
+```
+
+In your CMakeLists.txt:
+
+```cmake
+find_package(NekoNetwork CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE Neko::Network)
 ```
 
 ### Basic Example
@@ -821,7 +879,7 @@ If you're using NekoThreadPool, here's a complete integration example:
 
 ```cpp
 #include <neko/network/network.hpp>
-#include <neko/threadpool/thread_pool.hpp>
+#include <neko/thread/threadpool.hpp>
 
 using namespace neko::network;
 
