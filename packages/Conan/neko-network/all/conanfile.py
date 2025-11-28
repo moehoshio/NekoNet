@@ -17,6 +17,13 @@ class NekoNetworkConan(ConanFile):
     package_type = "static-library"
     exports_sources = "CMakeLists.txt", "include/*", "src/*", "tests/*", "cmake/*", "docs/*", "LICENSE", "README.md"
     
+    def requirements(self):
+        # self.requires("neko-schema/[*]")
+        # self.requires("neko-function/[*]")
+        # self.requires("neko-log/[*]")
+        # self.requires("neko-system/[*]")
+        self.requires("libcurl/[*]")
+        
     def layout(self):
         cmake_layout(self)
     
@@ -30,6 +37,8 @@ class NekoNetworkConan(ConanFile):
         tc.variables["NEKO_FUNCTION_BUILD_TESTS"] = False
         tc.variables["NEKO_LOG_BUILD_TESTS"] = False
         tc.variables["NEKO_SYSTEM_BUILD_TESTS"] = False
+        # Help CMake find CURL
+        tc.variables["CMAKE_FIND_PACKAGE_PREFER_CONFIG"] = True
         tc.generate()
         
         deps = CMakeDeps(self)
@@ -59,6 +68,8 @@ class NekoNetworkConan(ConanFile):
         # Note: Library will be installed via cmake.install() in package()
         lib_folder = os.path.join(self.package_folder, "lib")
         self.cpp_info.components["NekoNetwork"].libs = ["NekoNetwork"]
+        # Link libcurl dependency
+        self.cpp_info.components["NekoNetwork"].requires = ["libcurl::libcurl"]
     
     def package_id(self):
         self.info.clear()

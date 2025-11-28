@@ -59,6 +59,19 @@ if (NOT WIN32 AND NOT OPENSSL_FOUND)
     message(FATAL_ERROR "Neko Network not found OpenSSL ; if you installed it, you may need to set -DNEKO_NETWORK_LIBRARY_PATH=<path>")
 endif()
 
+# Create CURL::libcurl alias target if it doesn't exist
+if (NOT TARGET CURL::libcurl)
+
+    if (TARGET CURL::libcurl_static)
+        add_library(CURL::libcurl ALIAS CURL::libcurl_static)
+    endif()
+
+    if (TARGET CURL::libcurl_shared)
+        add_library(CURL::libcurl ALIAS CURL::libcurl_shared)
+    endif()
+    
+endif()
+
 # Create CURL::libcurl target if it doesn't exist (for older FindCURL.cmake)
 if(CURL_FOUND AND NOT TARGET CURL::libcurl)
     add_library(CURL::libcurl UNKNOWN IMPORTED)
@@ -72,6 +85,8 @@ if(CURL_FOUND AND NOT TARGET CURL::libcurl)
         )
     endif()
 endif()
+
+
 
 if(NEKO_NETWORK_AUTO_FETCH_DEPS)
     include(FetchContent)
