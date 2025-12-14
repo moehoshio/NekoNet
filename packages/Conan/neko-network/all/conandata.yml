@@ -11,3 +11,7 @@
   "1.0.2":
     url: "https://github.com/moehoshio/NekoNetwork/archive/refs/tags/v1.0.2.tar.gz"
     sha256: "6527663ec1768653e3da69695195b7b75b38f767e26580c5fc10206c51a429c0"
+
+  "1.0.3":
+    url: "https://github.com/moehoshio/NekoNetwork/archive/refs/tags/v1.0.3.tar.gz"
+    sha256: "4bc0ea1b9664fb390c24dc28b32343a0fc1558a23118be194585ab2f301744bc"
