@@ -161,36 +161,6 @@ namespace neko::network {
         if (std::filesystem::exists(caPath)) {
             curl_easy_setopt(curl, CURLOPT_CAINFO, caPath.c_str());
             logDebug("Network::initCurl() : Using custom CA bundle at: " + caPath);
-        } else {
-            // On Windows with OpenSSL, we need to be more explicit about using system CA
-            // Try common system CA bundle locations
-#ifdef _WIN32
-            // Windows system CA locations when using OpenSSL
-            const char* windowsCAPaths[] = {
-                "C:/Windows/System32/curl-ca-bundle.crt",
-                "C:/curl/bin/curl-ca-bundle.crt",
-                nullptr
-            };
-            
-            bool caFound = false;
-            for (const char** caPathPtr = windowsCAPaths; *caPathPtr != nullptr; ++caPathPtr) {
-                if (std::filesystem::exists(*caPathPtr)) {
-                    curl_easy_setopt(curl, CURLOPT_CAINFO, *caPathPtr);
-                    logDebug("Network::initCurl() : Using system CA bundle at: " + std::string(*caPathPtr));
-                    caFound = true;
-                    break;
-                }
-            }
-            
-            if (!caFound) {
-                // If no CA bundle found on Windows with OpenSSL, use SSL_VERIFYPEER = 0 as fallback
-                // This is less secure but allows connections to work
-                curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-                logWarn("Network::initCurl() : No CA bundle found, SSL peer verification disabled (less secure)");
-            }
-#else
-            // On Unix, libcurl should find the system CA bundle automatically
-#endif
         }
 
         curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NO_REVOKE);
