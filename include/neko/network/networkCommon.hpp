@@ -353,7 +353,7 @@ namespace neko::network {
         } else {
             config::globalConfig
                 .setProtocol("https://")
-                .setUserAgent("NekoNetwork/v1.0.2 +https://github.com/moehoshio/NekoNetwork")
+                .setUserAgent("NekoNetwork/v1.0.3 +https://github.com/moehoshio/NekoNetwork")
                 .setProxy("true");
         }
     }

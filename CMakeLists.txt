@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(NekoNetwork VERSION 1.0.2 LANGUAGES CXX)
+project(NekoNetwork VERSION 1.0.3 LANGUAGES CXX)
 
 # ================
 # ==== Config ====
@@ -66,6 +66,7 @@ message(STATUS "Start configuration Neko Network...")
 message(STATUS "")
 message(STATUS "NekoNetwork configuration summary:")
 message(STATUS "")
+message(STATUS "  - Project version: ${PROJECT_VERSION}")
 message(STATUS "  - CMake version: ${CMAKE_VERSION}")
 message(STATUS "  - Neko Network Library Path: ${NEKO_NETWORK_LIBRARY_PATH}")
 message(STATUS "  - CMake Prefix Path: ${CMAKE_PREFIX_PATH}")
